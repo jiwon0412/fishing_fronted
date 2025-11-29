@@ -104,7 +104,37 @@ class ClientHandler extends Thread {
                     this
                 );
             }
-        } else if (message.startsWith("/score ")) {
+        } 
+        else if (message.startsWith("/auction start ")) {
+            // 경매 시작: /auction start 물고기이름 점수 시작가
+            String[] parts = message.substring(15).split(" ");
+            if (parts.length >= 3) {
+                String fishName = parts[0];
+                String fishScore = parts[1];
+                String startPrice = parts[2];
+                FishingGameServer.broadcast(
+                    "/auction start " + userName + " " + fishName + " " + fishScore + " " + startPrice,
+                    this
+                );
+            }
+            
+        } else if (message.startsWith("/auction bid ")) {
+            // 입찰: /auction bid 입찰금액
+            String bidAmount = message.substring(13);
+            FishingGameServer.broadcast(
+                "/auction bid " + userName + " " + bidAmount,
+                this
+            );
+            
+        } else if (message.startsWith("/auction end ")) {
+            // 경매 종료: /auction end 낙찰자 낙찰가
+            String endInfo = message.substring(13);
+            FishingGameServer.broadcast(
+                "/auction end " + endInfo,
+                this
+            );
+        }
+        else if (message.startsWith("/score ")) {
             // 점수 업데이트
             String scoreInfo = message.substring(7);
             FishingGameServer.broadcast("/score " + userName + " " + scoreInfo, this);

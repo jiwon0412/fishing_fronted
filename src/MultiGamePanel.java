@@ -7,6 +7,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
@@ -26,6 +27,7 @@ public class MultiGamePanel extends JPanel {
     private int fishCaught = 0;
     private boolean isPaused = false;
     private String userName;
+    private String lastFishWord = ""; // 마지막으로 나온 물고기 기억
 
     // 네트워크 관련
     private Socket socket;
@@ -36,6 +38,15 @@ public class MultiGamePanel extends JPanel {
     private JTextArea chatArea = new JTextArea(10, 30);
     private JTextField chatInput = new JTextField(30);
     private JPanel chatPanel;
+
+    // 경매 관련
+    private Auction currentAuction = null;  // 현재 진행중인 경매
+    private JPanel auctionPanel;            // 경매 UI 패널
+    private JLabel auctionInfoLabel;        // 경매 정보 표시
+    private JTextField auctionBidField;     // 입찰 금액 입력
+    private JButton auctionBidButton;       // 입찰 버튼
+    private Timer auctionTimer;             // 경매 타이머
+    private Map<String, Integer> myInventory = new HashMap<>(); // 내 인벤토리
 
     private final Map<String, Integer> levelGoals = Map.of(
             "쉬움", 7,
@@ -64,9 +75,17 @@ public class MultiGamePanel extends JPanel {
 
         // 오른쪽: 채팅 패널
         chatPanel = createChatPanel();
+        
+        // 경매 패널 생성
+        auctionPanel = createAuctionPanel();
 
-        // 분할 패널로 게임과 채팅 나누기
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, gameArea, chatPanel);
+        // 오른쪽에 채팅 + 경매 패널
+        JPanel rightPanel = new JPanel(new BorderLayout());
+        rightPanel.add(chatPanel, BorderLayout.CENTER);
+        rightPanel.add(auctionPanel, BorderLayout.SOUTH);
+
+        // 분할 패널로 게임과 오른쪽 패널 나누기
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, gameArea, rightPanel);
         splitPane.setDividerLocation(550);
         add(splitPane, BorderLayout.CENTER);
 
@@ -86,6 +105,10 @@ public class MultiGamePanel extends JPanel {
                     int fishScore = textSource.getFishPrice(inWord);
                     scorePanel.increase(inWord);
                     scorePanel.addCaughtFish(inWord);
+                    
+                    // 내 인벤토리에 추가
+                    myInventory.put(inWord, myInventory.getOrDefault(inWord, 0) + 1);
+                    
                     fishCaught++;
 
                     // 서버에 알림
@@ -124,9 +147,9 @@ public class MultiGamePanel extends JPanel {
     // 채팅 패널 생성
     private JPanel createChatPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setPreferredSize(new Dimension(300, 600));
+        panel.setPreferredSize(new Dimension(300, 400));
 
-        JLabel chatLabel = new JLabel("💬 채팅 & 활동", JLabel.CENTER);
+        JLabel chatLabel = new JLabel("채팅 및 활동", JLabel.CENTER);
         chatLabel.setFont(new Font("맑은 고딕", Font.BOLD, 16));
         panel.add(chatLabel, BorderLayout.NORTH);
 
@@ -144,6 +167,121 @@ public class MultiGamePanel extends JPanel {
         return panel;
     }
 
+    // 경매 패널 생성
+    private JPanel createAuctionPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setPreferredSize(new Dimension(300, 200));
+        panel.setBorder(BorderFactory.createTitledBorder("🔨 경매"));
+
+        auctionInfoLabel = new JLabel("진행 중인 경매가 없습니다");
+        auctionInfoLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+        panel.add(auctionInfoLabel);
+
+        panel.add(Box.createVerticalStrut(10));
+
+        // 입찰 입력
+        JPanel bidPanel = new JPanel(new FlowLayout());
+        bidPanel.add(new JLabel("입찰가:"));
+        auctionBidField = new JTextField(10);
+        bidPanel.add(auctionBidField);
+        auctionBidButton = new JButton("입찰");
+        auctionBidButton.setEnabled(false);
+        bidPanel.add(auctionBidButton);
+        panel.add(bidPanel);
+
+        // 입찰 버튼 이벤트
+        auctionBidButton.addActionListener(e -> {
+            if (currentAuction == null) return;
+            
+            try {
+                int bidAmount = Integer.parseInt(auctionBidField.getText().trim());
+                
+                if (bidAmount <= currentAuction.getCurrentPrice()) {
+                    JOptionPane.showMessageDialog(this, 
+                        "현재가보다 높은 금액을 입찰하세요!");
+                    return;
+                }
+                
+                if (scorePanel.getMoney() < bidAmount) {
+                    JOptionPane.showMessageDialog(this, 
+                        "돈이 부족합니다!");
+                    return;
+                }
+                
+                // 서버에 입찰 전송
+                sendToServer("/auction bid " + bidAmount);
+                auctionBidField.setText("");
+                
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "올바른 금액을 입력하세요!");
+            }
+        });
+
+        panel.add(Box.createVerticalStrut(10));
+
+        // 내 물고기 경매 버튼
+        JButton myAuctionButton = new JButton("내 물고기 경매");
+        myAuctionButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        myAuctionButton.addActionListener(e -> openMyAuctionDialog());
+        panel.add(myAuctionButton);
+
+        return panel;
+    }
+
+    // 내 물고기 경매 다이얼로그
+    private void openMyAuctionDialog() {
+        if (currentAuction != null) {
+            JOptionPane.showMessageDialog(this, "이미 경매가 진행 중입니다!");
+            return;
+        }
+
+        if (myInventory.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "경매할 물고기가 없습니다!");
+            return;
+        }
+
+        // 내 물고기 목록
+        String[] fishList = myInventory.keySet().toArray(new String[0]);
+        String selectedFish = (String) JOptionPane.showInputDialog(
+            this,
+            "경매할 물고기를 선택하세요:",
+            "물고기 선택",
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            fishList,
+            fishList[0]
+        );
+
+        if (selectedFish == null) return;
+
+        // 시작가 자동 설정 (물고기 가격의 90%)
+        int fishScore = textSource.getFishPrice(selectedFish);
+        int startPrice = (int)(fishScore * 0.9); // 10% 할인
+
+        // 확인 메시지
+        int confirm = JOptionPane.showConfirmDialog(
+            this,
+            selectedFish + "을(를) 경매에 올리시겠습니까?\n" +
+            "물고기 가격: " + fishScore + "점\n" +
+            "시작가: " + startPrice + "원 (10% 할인)",
+            "경매 확인",
+            JOptionPane.YES_NO_OPTION
+        );
+
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        // 인벤토리에서 제거
+        int count = myInventory.get(selectedFish);
+        if (count == 1) {
+            myInventory.remove(selectedFish);
+        } else {
+            myInventory.put(selectedFish, count - 1);
+        }
+
+        // 서버에 경매 시작 알림
+        sendToServer("/auction start " + selectedFish + " " + fishScore + " " + startPrice);
+    }
     // 서버 연결
     private void connectToServer(String ipAddress, String portNo) {
         try {
@@ -202,9 +340,127 @@ public class MultiGamePanel extends JPanel {
             String sysMsg = message.substring(8);
             appendChat("📢 " + sysMsg + "\n");
             
+        } else if (message.startsWith("/auction start ")) {
+            // 경매 시작
+        	System.out.println("받은 경매 메시지: " + message); // 디버깅
+            String[] parts = message.substring(15).split(" ");
+            System.out.println("파싱 결과: " + parts.length + "개"); // 디버깅
+            if (parts.length >= 4) {
+                String seller = parts[0];
+                String fishName = parts[1];
+                int fishScore = Integer.parseInt(parts[2]);
+                int startPrice = Integer.parseInt(parts[3]);
+                
+                System.out.println("경매 시작: " + seller + ", " + fishName); // 디버깅
+                startAuction(seller, fishName, fishScore, startPrice);
+            }
+            else {
+                System.out.println("경매 메시지 파싱 실패!"); // 디버깅
+            }
+            
+        } else if (message.startsWith("/auction bid ")) {
+            // 입찰 알림
+            String[] parts = message.substring(13).split(" ");
+            if (parts.length >= 2) {
+                String bidder = parts[0];
+                int bidAmount = Integer.parseInt(parts[1]);
+                
+                if (currentAuction != null) {
+                    currentAuction.placeBid(bidder, bidAmount);
+                    updateAuctionInfo();
+                    appendChat("💰 " + bidder + "님이 " + bidAmount + "원 입찰!\n");
+                }
+            }
+            
+        } else if (message.startsWith("/auction end ")) {
+            // 경매 종료
+            String endInfo = message.substring(13);
+            appendChat("📢 " + endInfo + "\n");
+            endAuction();
+            
         } else {
             // 기타 메시지
             appendChat(message + "\n");
+        }
+    }
+
+    // 경매 시작
+    private void startAuction(String seller, String fishName, int fishScore, int startPrice) {
+        currentAuction = new Auction(seller, fishName, fishScore, startPrice);
+        
+        auctionBidButton.setEnabled(!seller.equals(userName)); // 판매자는 입찰 불가
+        updateAuctionInfo();
+        
+        appendChat("📢 " + seller + "님이 " + fishName + "(" + fishScore + "점)을 경매에 올렸습니다!\n");
+        appendChat("   시작가: " + startPrice + "원\n");
+        
+        // 30초 타이머
+        if (auctionTimer != null) {
+            auctionTimer.stop();
+        }
+        
+        auctionTimer = new Timer(1000, e -> {
+            if (currentAuction != null) {
+                if (currentAuction.isExpired()) {
+                    // 경매 종료
+                    String winner = currentAuction.getHighestBidder();
+                    int finalPrice = currentAuction.getCurrentPrice();
+                    String seller2 = currentAuction.getSeller();
+                    String fish = currentAuction.getFishName();
+                    
+                    if (winner.isEmpty()) {
+                        sendToServer("/auction end 유찰되었습니다!");
+                        
+                        // 판매자가 나면 다시 인벤토리에 추가
+                        if (seller2.equals(userName)) {
+                            myInventory.put(fish, myInventory.getOrDefault(fish, 0) + 1);
+                        }
+                    } else {
+                        sendToServer("/auction end " + winner + "님이 " + finalPrice + "원에 낙찰!");
+                        
+                        // 낙찰자가 나면 돈 차감, 물고기 추가
+                        if (winner.equals(userName)) {
+                            scorePanel.spendMoney(finalPrice);
+                            myInventory.put(fish, myInventory.getOrDefault(fish, 0) + 1);
+                        }
+                        
+                        // 판매자가 나면 돈 추가
+                        if (seller2.equals(userName)) {
+                            scorePanel.addMoney(finalPrice);
+                        }
+                    }
+                    
+                    auctionTimer.stop();
+                    endAuction();
+                } else {
+                    updateAuctionInfo();
+                }
+            }
+        });
+        auctionTimer.start();
+    }
+
+    // 경매 종료
+    private void endAuction() {
+        currentAuction = null;
+        auctionBidButton.setEnabled(false);
+        auctionInfoLabel.setText("진행 중인 경매가 없습니다");
+        if (auctionTimer != null) {
+            auctionTimer.stop();
+        }
+    }
+
+    // 경매 정보 업데이트
+    private void updateAuctionInfo() {
+        if (currentAuction != null) {
+            String info = "<html>" +
+                "물고기: " + currentAuction.getFishName() + " (" + currentAuction.getFishScore() + "점)<br>" +
+                "판매자: " + currentAuction.getSeller() + "<br>" +
+                "현재가: " + currentAuction.getCurrentPrice() + "원<br>" +
+                "최고입찰자: " + (currentAuction.getHighestBidder().isEmpty() ? "없음" : currentAuction.getHighestBidder()) + "<br>" +
+                "남은 시간: " + currentAuction.getRemainingSeconds() + "초" +
+                "</html>";
+            auctionInfoLabel.setText(info);
         }
     }
 
@@ -307,7 +563,21 @@ public class MultiGamePanel extends JPanel {
     }
 
     public void addNewWord() {
-        String newWord = rand.nextBoolean() ? textSource.getRandomFishWord() : textSource.getRandomFishPriceWord();
+        String newWord;
+        int attempts = 0; // 무한루프 방지
+        
+        do {
+            // 70% 확률로 물고기, 30% 확률로 낚시도구
+            if (rand.nextInt(100) < 70) {
+                newWord = textSource.getRandomFishPriceWordWithProbability(); // 확률 적용!
+            } else {
+                newWord = textSource.getRandomFishWord();
+            }
+            attempts++;
+        } while (newWord.equals(lastFishWord) && attempts < 10); // 같으면 다시 뽑기 (최대 10번)
+        
+        lastFishWord = newWord; // 이번에 나온 물고기 기억
+        
         FallingLabel newLabel = new FallingLabel(newWord);
 
         int randomX = rand.nextInt(ground.getWidth() - newLabel.getWidth());
