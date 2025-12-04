@@ -27,7 +27,7 @@ public class MultiGamePanel extends JPanel {
     private int fishCaught = 0;
     private boolean isPaused = false;
     private String userName;
-    private String lastFishWord = ""; // 마지막으로 나온 물고기 기억
+    private String lastFishWord = "";
 
     // 네트워크 관련
     private Socket socket;
@@ -40,13 +40,16 @@ public class MultiGamePanel extends JPanel {
     private JPanel chatPanel;
 
     // 경매 관련
-    private Auction currentAuction = null;  // 현재 진행중인 경매
-    private JPanel auctionPanel;            // 경매 UI 패널
-    private JLabel auctionInfoLabel;        // 경매 정보 표시
-    private JTextField auctionBidField;     // 입찰 금액 입력
-    private JButton auctionBidButton;       // 입찰 버튼
-    private Timer auctionTimer;             // 경매 타이머
-    private Map<String, Integer> myInventory = new HashMap<>(); // 내 인벤토리
+    private Auction currentAuction = null;
+    private JPanel auctionPanel;
+    private JLabel auctionInfoLabel;
+    private JTextField auctionBidField;
+    private JButton auctionBidButton;
+    private Timer auctionTimer;
+    private Map<String, Integer> myInventory = new HashMap<>();
+    
+    // 게임오버 화면
+    private JPanel gameOverPanel;
 
     private final Map<String, Integer> levelGoals = Map.of(
             "쉬움", 7,
@@ -68,7 +71,6 @@ public class MultiGamePanel extends JPanel {
         gameArea.add(ground, BorderLayout.CENTER);
         
         JPanel inputPanel = new JPanel();
-        inputPanel.setBackground(Color.CYAN);
         inputPanel.add(new JLabel("단어 입력:"));
         inputPanel.add(input);
         gameArea.add(inputPanel, BorderLayout.SOUTH);
@@ -257,7 +259,7 @@ public class MultiGamePanel extends JPanel {
 
         // 시작가 자동 설정 (물고기 가격의 90%)
         int fishScore = textSource.getFishPrice(selectedFish);
-        int startPrice = (int)(fishScore * 0.9); // 10% 할인
+        int startPrice = (int)(fishScore * 0.9);
 
         // 확인 메시지
         int confirm = JOptionPane.showConfirmDialog(
@@ -282,6 +284,7 @@ public class MultiGamePanel extends JPanel {
         // 서버에 경매 시작 알림
         sendToServer("/auction start " + selectedFish + " " + fishScore + " " + startPrice);
     }
+
     // 서버 연결
     private void connectToServer(String ipAddress, String portNo) {
         try {
@@ -326,40 +329,28 @@ public class MultiGamePanel extends JPanel {
     // 서버 메시지 처리
     private void handleServerMessage(String message) {
         if (message.startsWith("/chat ")) {
-            // 채팅 메시지
             String chatMsg = message.substring(6);
             appendChat(chatMsg + "\n");
             
         } else if (message.startsWith("/catch ")) {
-            // 물고기 잡기 알림
             String catchMsg = message.substring(7);
             appendChat("🎣 " + catchMsg + "\n");
             
         } else if (message.startsWith("/system ")) {
-            // 시스템 메시지
             String sysMsg = message.substring(8);
             appendChat("📢 " + sysMsg + "\n");
             
         } else if (message.startsWith("/auction start ")) {
-            // 경매 시작
-        	System.out.println("받은 경매 메시지: " + message); // 디버깅
             String[] parts = message.substring(15).split(" ");
-            System.out.println("파싱 결과: " + parts.length + "개"); // 디버깅
             if (parts.length >= 4) {
                 String seller = parts[0];
                 String fishName = parts[1];
                 int fishScore = Integer.parseInt(parts[2]);
                 int startPrice = Integer.parseInt(parts[3]);
-                
-                System.out.println("경매 시작: " + seller + ", " + fishName); // 디버깅
                 startAuction(seller, fishName, fishScore, startPrice);
-            }
-            else {
-                System.out.println("경매 메시지 파싱 실패!"); // 디버깅
             }
             
         } else if (message.startsWith("/auction bid ")) {
-            // 입찰 알림
             String[] parts = message.substring(13).split(" ");
             if (parts.length >= 2) {
                 String bidder = parts[0];
@@ -373,13 +364,11 @@ public class MultiGamePanel extends JPanel {
             }
             
         } else if (message.startsWith("/auction end ")) {
-            // 경매 종료
             String endInfo = message.substring(13);
             appendChat("📢 " + endInfo + "\n");
             endAuction();
             
         } else {
-            // 기타 메시지
             appendChat(message + "\n");
         }
     }
@@ -388,13 +377,12 @@ public class MultiGamePanel extends JPanel {
     private void startAuction(String seller, String fishName, int fishScore, int startPrice) {
         currentAuction = new Auction(seller, fishName, fishScore, startPrice);
         
-        auctionBidButton.setEnabled(!seller.equals(userName)); // 판매자는 입찰 불가
+        auctionBidButton.setEnabled(!seller.equals(userName));
         updateAuctionInfo();
         
         appendChat("📢 " + seller + "님이 " + fishName + "(" + fishScore + "점)을 경매에 올렸습니다!\n");
         appendChat("   시작가: " + startPrice + "원\n");
         
-        // 30초 타이머
         if (auctionTimer != null) {
             auctionTimer.stop();
         }
@@ -402,7 +390,6 @@ public class MultiGamePanel extends JPanel {
         auctionTimer = new Timer(1000, e -> {
             if (currentAuction != null) {
                 if (currentAuction.isExpired()) {
-                    // 경매 종료
                     String winner = currentAuction.getHighestBidder();
                     int finalPrice = currentAuction.getCurrentPrice();
                     String seller2 = currentAuction.getSeller();
@@ -411,20 +398,17 @@ public class MultiGamePanel extends JPanel {
                     if (winner.isEmpty()) {
                         sendToServer("/auction end 유찰되었습니다!");
                         
-                        // 판매자가 나면 다시 인벤토리에 추가
                         if (seller2.equals(userName)) {
                             myInventory.put(fish, myInventory.getOrDefault(fish, 0) + 1);
                         }
                     } else {
                         sendToServer("/auction end " + winner + "님이 " + finalPrice + "원에 낙찰!");
                         
-                        // 낙찰자가 나면 돈 차감, 물고기 추가
                         if (winner.equals(userName)) {
                             scorePanel.spendMoney(finalPrice);
                             myInventory.put(fish, myInventory.getOrDefault(fish, 0) + 1);
                         }
                         
-                        // 판매자가 나면 돈 추가
                         if (seller2.equals(userName)) {
                             scorePanel.addMoney(finalPrice);
                         }
@@ -564,19 +548,18 @@ public class MultiGamePanel extends JPanel {
 
     public void addNewWord() {
         String newWord;
-        int attempts = 0; // 무한루프 방지
+        int attempts = 0;
         
         do {
-            // 70% 확률로 물고기, 30% 확률로 낚시도구
             if (rand.nextInt(100) < 70) {
-                newWord = textSource.getRandomFishPriceWordWithProbability(); // 확률 적용!
+                newWord = textSource.getRandomFishPriceWord();
             } else {
                 newWord = textSource.getRandomFishWord();
             }
             attempts++;
-        } while (newWord.equals(lastFishWord) && attempts < 10); // 같으면 다시 뽑기 (최대 10번)
+        } while (newWord.equals(lastFishWord) && attempts < 10);
         
-        lastFishWord = newWord; // 이번에 나온 물고기 기억
+        lastFishWord = newWord;
         
         FallingLabel newLabel = new FallingLabel(newWord);
 
@@ -605,9 +588,7 @@ public class MultiGamePanel extends JPanel {
 
                     if (lifePanel.isGameOver()) {
                         stopGame(false);
-                        JOptionPane.showMessageDialog(MultiGamePanel.this, 
-                            "게임 종료! 최종 점수: " + scorePanel.getScore(),
-                            "게임 종료", JOptionPane.INFORMATION_MESSAGE);
+                        showGameOver(); // ← 변경됨!
                     }
                 }
             }
@@ -615,6 +596,90 @@ public class MultiGamePanel extends JPanel {
         fallingTimer.start();
         return fallingTimer;
     }
+
+    // ========== 게임오버 화면 메서드들 ==========
+    
+    private void showGameOver() {
+        gameOverPanel = new JPanel() {
+            private Image gameOverImage;
+            
+            {
+                try {
+                    gameOverImage = new ImageIcon("GameOver.png").getImage();
+                } catch (Exception e) {
+                    System.out.println("GameOver.png 이미지를 불러올 수 없습니다");
+                    e.printStackTrace();
+                }
+            }
+            
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (gameOverImage != null) {
+                    // 이미지를 패널 크기에 맞게 그리기
+                    g.drawImage(gameOverImage, 0, 0, getWidth(), getHeight(), this);
+                } else {
+                    // 이미지 로드 실패 시 반투명 배경
+                    Graphics2D g2d = (Graphics2D) g;
+                    g2d.setColor(new Color(0, 0, 0, 180));
+                    g2d.fillRect(0, 0, getWidth(), getHeight());
+                }
+            }
+        };
+        gameOverPanel.setOpaque(false);
+        gameOverPanel.setLayout(null);
+        gameOverPanel.setBounds(0, 0, ground.getWidth(), ground.getHeight());
+        
+        // 투명 버튼 (이미지의 MAIN MENU 버튼 위치에 배치)
+        JButton menuButton = new JButton();
+        menuButton.setOpaque(false);
+        menuButton.setContentAreaFilled(false);
+        menuButton.setBorderPainted(false);
+        menuButton.setFocusPainted(false);
+        menuButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        menuButton.addActionListener(e -> goToMainMenu());
+        
+        // 이미지 비율에 맞게 버튼 위치 계산
+        // 원본 이미지: 847x924
+        // MAIN MENU 버튼 위치: 중앙 약간 위쪽
+        int panelWidth = ground.getWidth();
+        int panelHeight = ground.getHeight();
+        
+        // 이미지 비율로 버튼 위치 계산
+        int buttonWidth = (int)(panelWidth * 0.4);   // 화면의 40%
+        int buttonHeight = (int)(panelHeight * 0.08); // 화면의 8%
+        int x = (panelWidth - buttonWidth) / 2;       // 중앙 정렬
+        int y = (int)(panelHeight * 0.45);            // 화면의 45% 위치
+        
+        menuButton.setBounds(x, y, buttonWidth, buttonHeight);
+        
+        gameOverPanel.add(menuButton);
+        
+        ground.setLayout(null);
+        ground.add(gameOverPanel);
+        ground.setComponentZOrder(gameOverPanel, 0);
+        ground.revalidate();
+        ground.repaint();
+    }
+    
+    private void hideGameOver() {
+        if (gameOverPanel != null) {
+            ground.remove(gameOverPanel);
+            gameOverPanel = null;
+            ground.revalidate();
+            ground.repaint();
+        }
+    }
+    
+    private void goToMainMenu() {
+        Window window = SwingUtilities.getWindowAncestor(this);
+        if (window != null) {
+            window.dispose();
+        }
+        SwingUtilities.invokeLater(() -> new MultiStartPanel());
+    }
+
+    // ========== 내부 클래스 ==========
 
     class FallingLabel extends JLabel {
         private String word;
@@ -668,7 +733,7 @@ public class MultiGamePanel extends JPanel {
                     break;
                 case "쉬움":
                 default:
-                    backgroundImage = new ImageIcon("level1.jpg").getImage();
+                    backgroundImage = new ImageIcon("BackGround1.png").getImage();
                     break;
             }
             repaint();
