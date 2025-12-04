@@ -122,6 +122,6 @@ public class MultiGameFrame extends JFrame {
 
     public static void main(String[] args) {
         // 테스트용
-        new MultiGameFrame("테스터", "쉬움", "127.0.0.1", "30000");
+        new MultiGameFrame("테스터", "쉬움", "127.0.0.1", "40000");
     }
 }

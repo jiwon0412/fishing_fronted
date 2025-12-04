@@ -65,4 +65,8 @@ public class EditPanel extends JPanel {
         });
 
     }
+
+	public EditPanel(GameSetupPanel gameSetupPanel, String string) {
+		// TODO Auto-generated constructor stub
+	}
 }

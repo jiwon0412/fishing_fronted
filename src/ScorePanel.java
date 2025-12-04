@@ -15,6 +15,8 @@ import java.util.Map;
 
 public class ScorePanel extends JPanel {
     private int score = 0; // 현재 점수를 저장하는 변수
+    private int money = 0; // 경매용 돈 (점수와 동일하게 시작)
+    private JLabel moneyLabel = new JLabel("0원");
     private JLabel textLabel = new JLabel("< 그물망 >");
     private JLabel scoreLabel = new JLabel(Integer.toString(score));
     private JPanel caughtFishPanel = new JPanel(); // 잡힌 물고기 이름을 표시할 패널
@@ -37,6 +39,16 @@ public class ScorePanel extends JPanel {
         add(scoreLabel);
 
         add(Box.createVerticalStrut(10)); // 간격 추가
+     // 돈 표시 추가
+        JLabel moneyTextLabel = new JLabel("💰 보유 금액:");
+        moneyTextLabel.setFont(new Font("맑은 고딕", Font.BOLD, 16));
+        moneyTextLabel.setForeground(Color.DARK_GRAY);
+        add(moneyTextLabel);
+
+        moneyLabel.setFont(new Font("맑은 고딕", Font.BOLD, 18));
+        moneyLabel.setForeground(Color.BLUE);
+        add(moneyLabel);
+        add(Box.createVerticalStrut(10));
 
         // 잡힌 물고기 패널 설정
         caughtFishPanel.setLayout(new BoxLayout(caughtFishPanel, BoxLayout.Y_AXIS));
@@ -48,13 +60,15 @@ public class ScorePanel extends JPanel {
 
     // 점수 증가 메소드
     public void increase(String word) {
-        Integer fishPrice = fishPrices.get(word);  // 물고기 이름에 해당하는 가격을 가져옴
-        if (fishPrice != null) { // 물고기 가격이 존재하면 점수에 추가
-            score += fishPrice;  // 물고기 가격만큼 점수 증가
-            scoreLabel.setText(Integer.toString(score));  // 점수 업데이트
+        Integer fishPrice = fishPrices.get(word);
+        if (fishPrice != null) {
+            score += fishPrice;
+            money += fishPrice; // 돈도 같이 증가!
+            scoreLabel.setText(Integer.toString(score));
+            moneyLabel.setText(money + "원");
         }
     }
-
+    
     // 잡힌 물고기 표시 메소드
     public void addCaughtFish(String fishName) {
         caughtFishCount.put(fishName, caughtFishCount.getOrDefault(fishName, 0) + 1);
@@ -105,5 +119,24 @@ public class ScorePanel extends JPanel {
         caughtFishPanel.removeAll(); // 물고기 목록 패널 초기화
         caughtFishPanel.revalidate();  // 레이아웃을 다시 계산하여 갱신
         caughtFishPanel.repaint(); // 화면을 다시 그리기
+    }
+    public int getMoney() {
+        return money;
+    }
+
+    // 돈 추가 (경매로 팔았을 때)
+    public void addMoney(int amount) {
+        money += amount;
+        moneyLabel.setText(money + "원");
+    }
+
+    // 돈 차감 (경매로 샀을 때)
+    public boolean spendMoney(int amount) {
+        if (money >= amount) {
+            money -= amount;
+            moneyLabel.setText(money + "원");
+            return true;
+        }
+        return false; // 돈이 부족함
     }
 }
