@@ -70,9 +70,25 @@ public class MultiGamePanel extends JPanel {
         JPanel gameArea = new JPanel(new BorderLayout());
         gameArea.add(ground, BorderLayout.CENTER);
         
-        JPanel inputPanel = new JPanel();
-        inputPanel.add(new JLabel("단어 입력:"));
-        inputPanel.add(input);
+        // 단어 입력 패널 - BorderLayout으로 가로 배치
+        JPanel inputPanel = new JPanel(new BorderLayout(10, 0));
+        inputPanel.setBackground(new Color(238, 214, 175));  // 모래색 배경
+        inputPanel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));  // 여백
+        
+        JLabel inputLabel = new JLabel("단어 입력:");
+        inputLabel.setFont(new Font("맑은 고딕", Font.BOLD, 18));
+        inputLabel.setForeground(new Color(101, 67, 33));  // 진한 갈색
+        
+        input.setFont(new Font("맑은 고딕", Font.BOLD, 18));
+        input.setBackground(new Color(255, 248, 220));  // 밝은 크림색
+        input.setForeground(new Color(101, 67, 33));  // 진한 갈색 텍스트
+        input.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(139, 90, 43), 2),  // 갈색 테두리
+            BorderFactory.createEmptyBorder(5, 10, 5, 10)  // 내부 여백
+        ));
+        
+        inputPanel.add(inputLabel, BorderLayout.WEST);  // 라벨 왼쪽
+        inputPanel.add(input, BorderLayout.CENTER);     // 입력창 중앙 (자동 확장)
         gameArea.add(inputPanel, BorderLayout.SOUTH);
 
         // 오른쪽: 채팅 패널
@@ -133,6 +149,8 @@ public class MultiGamePanel extends JPanel {
                         break;
                     }
                 }
+             // 잘못 입력했을 때도 자동으로 입력창 지우기
+             input.setText("");  // ← 추가! (틀린 단어일 때)
             }
         });
 
@@ -490,13 +508,25 @@ public class MultiGamePanel extends JPanel {
 
         fishCaught = 0;
         resetGame();
+        
+        // 타이틀바 업데이트
+        updateFrameTitle();
 
-        JOptionPane.showMessageDialog(this, 
-            "레벨 업! " + level + " 레벨이 시작됩니다! 목표: " + levelGoals.get(level) + "개의 물고기 잡기!");
+        JOptionPane.showMessageDialog(this,
+        	    "레벨 업! 난이도: " + level + "\n새로운 도전을 시작합니다!");
 
         Timer timer = new Timer(3000, e -> startGame());
         timer.setRepeats(false);
         timer.start();
+    }
+    
+    // 프레임 타이틀 업데이트 메서드
+    private void updateFrameTitle() {
+        Window window = SwingUtilities.getWindowAncestor(this);
+        if (window instanceof JFrame) {
+            JFrame frame = (JFrame) window;
+            frame.setTitle(userName + "의 멀티플레이어 Fishing - 난이도: " + level);
+        }
     }
 
     private int getFallingSpeed(String level) {
@@ -509,6 +539,16 @@ public class MultiGamePanel extends JPanel {
     }
 
     public void startGame() {
+    	// 게임 시작 목표 안내 추가
+        int goal = levelGoals.get(level);
+        JOptionPane.showMessageDialog(this, 
+            "🎣 낚시 게임 시작!\n\n" +
+            "난이도: " + level + "\n" +
+            "목표: 물고기 " + goal + "마리 잡기\n\n" +
+            "행운을 빕니다!",
+            "게임 목표", 
+            JOptionPane.INFORMATION_MESSAGE);
+
         if (isPaused) {
             isPaused = false;
             if (gameTimer != null) gameTimer.start();

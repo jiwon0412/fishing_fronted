@@ -6,6 +6,7 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.ImageIcon;
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -20,22 +21,35 @@ public class ScorePanel extends JPanel {
     private JLabel textLabel = new JLabel("< 그물망 >");
     private JLabel scoreLabel = new JLabel(Integer.toString(score));
     private JPanel caughtFishPanel = new JPanel(); // 잡힌 물고기 이름을 표시할 패널
+    private JScrollPane scrollPane; // 스크롤 패널 추가
     private Map<String, Integer> caughtFishCount = new HashMap<>(); // 물고기 이름과 그 물고기가 잡힌 횟수를 저장하는 맵
+    private Image backgroundImage; // 배경 이미지
 
     private Map<String, Integer> fishPrices = new HashMap<>(); // 물고기 이름과 가격을 저장하는 맵
 
     public ScorePanel() {
+        // 배경 이미지 로드
+        try {
+            backgroundImage = new ImageIcon("Net.jpg").getImage();
+        } catch (Exception e) {
+            System.out.println("Net.jpg 이미지를 불러올 수 없습니다");
+            e.printStackTrace();
+        }
+        
     	 // 레이아웃 설정: Y축으로 컴포넌트가 쌓이도록 설정
-        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));  
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        setOpaque(false); // 패널을 투명하게 설정
 
         // 점수 텍스트 레이블 설정
         textLabel.setFont(new Font("맑은 고딕", Font.BOLD, 20));
         textLabel.setForeground(Color.DARK_GRAY);
+        textLabel.setOpaque(false); // 투명하게
         add(textLabel);
 
         // 점수 값 레이블 설정
         scoreLabel.setFont(new Font("맑은 고딕", Font.BOLD, 20));
         scoreLabel.setForeground(Color.RED);
+        scoreLabel.setOpaque(false); // 투명하게
         add(scoreLabel);
 
         add(Box.createVerticalStrut(10)); // 간격 추가
@@ -43,16 +57,27 @@ public class ScorePanel extends JPanel {
         JLabel moneyTextLabel = new JLabel("💰 보유 금액:");
         moneyTextLabel.setFont(new Font("맑은 고딕", Font.BOLD, 16));
         moneyTextLabel.setForeground(Color.DARK_GRAY);
+        moneyTextLabel.setOpaque(false); // 투명하게
         add(moneyTextLabel);
 
         moneyLabel.setFont(new Font("맑은 고딕", Font.BOLD, 18));
         moneyLabel.setForeground(Color.BLUE);
+        moneyLabel.setOpaque(false); // 투명하게
         add(moneyLabel);
         add(Box.createVerticalStrut(10));
 
         // 잡힌 물고기 패널 설정
         caughtFishPanel.setLayout(new BoxLayout(caughtFishPanel, BoxLayout.Y_AXIS));
-        add(caughtFishPanel);
+        caughtFishPanel.setOpaque(false); // 투명하게
+        
+        // 스크롤 패널로 감싸기
+        scrollPane = new JScrollPane(caughtFishPanel);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setBorder(null); // 테두리 제거
+        scrollPane.setOpaque(false); // 스크롤 패널 투명하게
+        scrollPane.getViewport().setOpaque(false); // 뷰포트도 투명하게
+        add(scrollPane);
 
         // 물고기 가격 로드
         loadFishPricesFromFile("fish_prices.txt");
@@ -114,12 +139,15 @@ public class ScorePanel extends JPanel {
  // 점수와 잡힌 물고기 목록을 초기화하는 reset() 메서드 추가
     public void reset() {
         score = 0; // 점수 초기화
+        money = 0; // 돈 초기화
         caughtFishCount.clear(); // 잡힌 물고기 목록 초기화
         scoreLabel.setText(Integer.toString(score)); // 점수 레이블 업데이트
+        moneyLabel.setText(money + "원"); // 돈 레이블 업데이트
         caughtFishPanel.removeAll(); // 물고기 목록 패널 초기화
         caughtFishPanel.revalidate();  // 레이아웃을 다시 계산하여 갱신
         caughtFishPanel.repaint(); // 화면을 다시 그리기
     }
+    
     public int getMoney() {
         return money;
     }
@@ -138,5 +166,15 @@ public class ScorePanel extends JPanel {
             return true;
         }
         return false; // 돈이 부족함
+    }
+    
+    // 배경 이미지 그리기
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        if (backgroundImage != null) {
+            // 이미지를 패널 크기에 맞게 그리기
+            g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
+        }
     }
 }
