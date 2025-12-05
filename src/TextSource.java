@@ -39,17 +39,62 @@ public class TextSource {
         }
     }
 
-    // fish_words.txt에서 랜덤 물고기 이름을 반환
+    // fish_words.txt에서 랜덤 물고기 이름을 반환 (낚시 도구)
     public String getRandomFishWord() {
         Random rand = new Random();
         return fishNames.get(rand.nextInt(fishNames.size()));  // 랜덤으로 물고기 이름 반환
     }
 
-    // fish_prices.txt에서 랜덤 물고기 이름을 반환
+    // fish_prices.txt에서 랜덤 물고기 이름을 반환 (기존 메서드 - 호환성 유지)
     public String getRandomFishPriceWord() {
         List<String> fishPriceWords = new ArrayList<>(fishPrices.keySet());
         Random rand = new Random();
         return fishPriceWords.get(rand.nextInt(fishPriceWords.size()));  // 랜덤으로 물고기 이름 반환
+    }
+
+    // 🎲 NEW! 가격에 따른 확률을 적용한 랜덤 물고기 반환
+    public String getRandomFishPriceWordWithProbability() {
+        Random rand = new Random();
+        int randomValue = rand.nextInt(100); // 0-99 랜덤 값
+        
+        // 가격별로 물고기 분류
+        List<String> cheap = new ArrayList<>();      // 50점 이하
+        List<String> medium = new ArrayList<>();     // 51-90점
+        List<String> expensive = new ArrayList<>();  // 91점 이상
+        
+        for (Map.Entry<String, Integer> entry : fishPrices.entrySet()) {
+            int price = entry.getValue();
+            String fishName = entry.getKey();
+            
+            if (price <= 50) {
+                cheap.add(fishName);
+            } else if (price <= 90) {
+                medium.add(fishName);
+            } else {
+                expensive.add(fishName);
+            }
+        }
+        
+        // 확률에 따라 선택
+        if (randomValue < 50) {
+            // 50% 확률 - 저렴한 물고기 (0-49)
+            if (!cheap.isEmpty()) {
+                return cheap.get(rand.nextInt(cheap.size()));
+            }
+        } else if (randomValue < 80) {
+            // 30% 확률 - 중간 가격 물고기 (50-79)
+            if (!medium.isEmpty()) {
+                return medium.get(rand.nextInt(medium.size()));
+            }
+        } else {
+            // 20% 확률 - 비싼 물고기 (80-99)
+            if (!expensive.isEmpty()) {
+                return expensive.get(rand.nextInt(expensive.size()));
+            }
+        }
+        
+        // 혹시 해당 가격대에 물고기가 없으면 아무거나 반환
+        return getRandomFishPriceWord();
     }
 
     // fish_words.txt에 있는 모든 물고기 이름 반환
