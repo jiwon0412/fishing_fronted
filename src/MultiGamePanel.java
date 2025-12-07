@@ -1,4 +1,6 @@
 import javax.swing.*;
+import javax.swing.border.*;
+import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -35,7 +37,9 @@ public class MultiGamePanel extends JPanel {
     private DataOutputStream dos;
     
     // 채팅 관련
-    private JTextArea chatArea = new JTextArea(10, 30);
+    private JPanel chatMessagesPanel = new JPanel();  // 채팅 메시지들을 담을 패널
+    private JScrollPane chatScrollPane;  // 스크롤 패널
+    private JTextPane activityLog = new JTextPane();  // 활동 로그
     private JTextField chatInput = new JTextField(30);
     private JPanel chatPanel;
 
@@ -62,7 +66,7 @@ public class MultiGamePanel extends JPanel {
         this.scorePanel = scorePanel;
         this.lifePanel = lifePanel;
         this.level = level;
-        this.userName = userName;
+        this.userName = userName;  // 이미 필드에 선언되어 있음
 
         setLayout(new BorderLayout());
 
@@ -70,9 +74,25 @@ public class MultiGamePanel extends JPanel {
         JPanel gameArea = new JPanel(new BorderLayout());
         gameArea.add(ground, BorderLayout.CENTER);
         
-        JPanel inputPanel = new JPanel();
-        inputPanel.add(new JLabel("단어 입력:"));
-        inputPanel.add(input);
+        // 단어 입력 패널 - BorderLayout으로 가로 배치
+        JPanel inputPanel = new JPanel(new BorderLayout(10, 0));
+        inputPanel.setBackground(new Color(238, 214, 175));  // 모래색 배경
+        inputPanel.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));  // 여백
+        
+        JLabel inputLabel = new JLabel("단어 입력:");
+        inputLabel.setFont(new Font("맑은 고딕", Font.BOLD, 18));
+        inputLabel.setForeground(new Color(101, 67, 33));  // 진한 갈색
+        
+        input.setFont(new Font("맑은 고딕", Font.BOLD, 18));
+        input.setBackground(new Color(255, 248, 220));  // 밝은 크림색
+        input.setForeground(new Color(101, 67, 33));  // 진한 갈색 텍스트
+        input.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(139, 90, 43), 2),  // 갈색 테두리
+            BorderFactory.createEmptyBorder(5, 10, 5, 10)  // 내부 여백
+        ));
+        
+        inputPanel.add(inputLabel, BorderLayout.WEST);  // 라벨 왼쪽
+        inputPanel.add(input, BorderLayout.CENTER);     // 입력창 중앙 (자동 확장)
         gameArea.add(inputPanel, BorderLayout.SOUTH);
 
         // 오른쪽: 채팅 패널
@@ -133,6 +153,8 @@ public class MultiGamePanel extends JPanel {
                         break;
                     }
                 }
+             // 잘못 입력했을 때도 자동으로 입력창 지우기
+             input.setText("");
             }
         });
 
@@ -146,49 +168,163 @@ public class MultiGamePanel extends JPanel {
         });
     }
 
-    // 채팅 패널 생성
+    // 채팅 패널 생성 - 카카오톡 스타일
     private JPanel createChatPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setPreferredSize(new Dimension(300, 400));
+        // 배경 이미지 패널
+        JPanel panel = new JPanel(new BorderLayout()) {
+            private Image bgImage;
+            
+            {
+                try {
+                    bgImage = new ImageIcon("Chatting.png").getImage();
+                } catch (Exception e) {
+                    System.out.println("Chatting.png 이미지를 불러올 수 없습니다");
+                }
+            }
+            
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (bgImage != null) {
+                    g.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
+                }
+            }
+        };
+        
+        panel.setPreferredSize(new Dimension(300, 450));
+        panel.setOpaque(false);
 
-        JLabel chatLabel = new JLabel("채팅 및 활동", JLabel.CENTER);
-        chatLabel.setFont(new Font("맑은 고딕", Font.BOLD, 16));
-        panel.add(chatLabel, BorderLayout.NORTH);
+        // === 상단: 채팅 메시지 영역 ===
+        JPanel chatSection = new JPanel(new BorderLayout());
+        chatSection.setOpaque(false);
+        chatSection.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
 
-        chatArea.setEditable(false);
-        chatArea.setLineWrap(true);
-        chatArea.setWrapStyleWord(true);
-        JScrollPane scrollPane = new JScrollPane(chatArea);
-        panel.add(scrollPane, BorderLayout.CENTER);
+        // 채팅 메시지 패널 (BoxLayout - 위에서 아래로)
+        chatMessagesPanel.setLayout(new BoxLayout(chatMessagesPanel, BoxLayout.Y_AXIS));
+        chatMessagesPanel.setOpaque(false);
+        chatMessagesPanel.setAlignmentY(Component.TOP_ALIGNMENT);
+        
+        chatScrollPane = new JScrollPane(chatMessagesPanel);
+        chatScrollPane.setBorder(null);
+        chatScrollPane.setPreferredSize(new Dimension(280, 200));
+        chatScrollPane.setOpaque(false);
+        chatScrollPane.getViewport().setOpaque(false);
+        chatScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        chatScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        chatSection.add(chatScrollPane, BorderLayout.CENTER);
 
-        JPanel inputPanel = new JPanel(new BorderLayout());
-        inputPanel.add(new JLabel("메시지: "), BorderLayout.WEST);
-        inputPanel.add(chatInput, BorderLayout.CENTER);
-        panel.add(inputPanel, BorderLayout.SOUTH);
+        // 메시지 입력 - 중앙 정렬, 둥근 모서리
+        JPanel inputPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        inputPanel.setOpaque(false);
+        inputPanel.setBorder(BorderFactory.createEmptyBorder(5, 20, 5, 20));
+        
+        // 둥근 모서리 입력창
+        chatInput = new JTextField(20) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(getBackground());
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 15, 15);
+                super.paintComponent(g);
+                g2.dispose();
+            }
+            
+            @Override
+            protected void paintBorder(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(100, 180, 255));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 15, 15);
+                g2.dispose();
+            }
+        };
+        
+        chatInput.setFont(new Font("맑은 고딕", Font.PLAIN, 13));
+        chatInput.setBackground(new Color(255, 255, 255, 230));
+        chatInput.setOpaque(false);
+        chatInput.setBorder(BorderFactory.createEmptyBorder(8, 15, 8, 15));
+        chatInput.setPreferredSize(new Dimension(240, 35));
+        
+        inputPanel.add(chatInput);
+        chatSection.add(inputPanel, BorderLayout.SOUTH);
+
+        panel.add(chatSection, BorderLayout.NORTH);
+
+        // === 하단: 활동 로그 영역 ===
+        JPanel activitySection = new JPanel(new BorderLayout());
+        activitySection.setOpaque(false);
+        activitySection.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
+        
+        JLabel activityLabel = new JLabel("📊 활동 로그", JLabel.CENTER);
+        activityLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 11));
+        activityLabel.setForeground(new Color(120, 120, 120));
+        activityLabel.setOpaque(false);
+        activityLabel.setBorder(BorderFactory.createEmptyBorder(3, 5, 3, 5));
+        activitySection.add(activityLabel, BorderLayout.NORTH);
+
+        activityLog.setEditable(false);
+        activityLog.setFont(new Font("맑은 고딕", Font.PLAIN, 10));
+        activityLog.setOpaque(false);
+        
+        JScrollPane activityScroll = new JScrollPane(activityLog);
+        activityScroll.setBorder(null);
+        activityScroll.setOpaque(false);
+        activityScroll.getViewport().setOpaque(false);
+        activitySection.add(activityScroll, BorderLayout.CENTER);
+
+        panel.add(activitySection, BorderLayout.CENTER);
 
         return panel;
     }
 
-    // 경매 패널 생성
+    // 경매 패널 생성 - 작고 눈에 덜 띄게
     private JPanel createAuctionPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setPreferredSize(new Dimension(300, 200));
-        panel.setBorder(BorderFactory.createTitledBorder("🔨 경매"));
+        panel.setPreferredSize(new Dimension(300, 150));  // 크기 축소
+        panel.setBackground(new Color(240, 240, 240));  // 회색 배경
+        panel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(180, 180, 180), 1),  // 회색 테두리
+            BorderFactory.createEmptyBorder(5, 8, 5, 8)  // 내부 여백
+        ));
+
+        // 경매 헤더 - 눈에 덜 띄게
+        JLabel auctionHeader = new JLabel("🔨 경매");
+        auctionHeader.setFont(new Font("맑은 고딕", Font.PLAIN, 12));  // 폰트 작게
+        auctionHeader.setForeground(new Color(120, 120, 120));  // 회색
+        auctionHeader.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.add(auctionHeader);
+        
+        panel.add(Box.createVerticalStrut(5));
 
         auctionInfoLabel = new JLabel("진행 중인 경매가 없습니다");
-        auctionInfoLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+        auctionInfoLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 11));  // 작은 폰트
+        auctionInfoLabel.setForeground(new Color(100, 100, 100));  // 회색
+        auctionInfoLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(auctionInfoLabel);
 
-        panel.add(Box.createVerticalStrut(10));
+        panel.add(Box.createVerticalStrut(5));
 
-        // 입찰 입력
-        JPanel bidPanel = new JPanel(new FlowLayout());
-        bidPanel.add(new JLabel("입찰가:"));
-        auctionBidField = new JTextField(10);
+        // 입찰 입력 - 작고 간단하게
+        JPanel bidPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 3, 0));
+        bidPanel.setBackground(new Color(240, 240, 240));
+        bidPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
+        JLabel bidLabel = new JLabel("입찰:");
+        bidLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 11));
+        bidLabel.setForeground(new Color(100, 100, 100));
+        bidPanel.add(bidLabel);
+        
+        auctionBidField = new JTextField(8);  // 크기 축소
+        auctionBidField.setFont(new Font("맑은 고딕", Font.PLAIN, 11));
         bidPanel.add(auctionBidField);
+        
         auctionBidButton = new JButton("입찰");
+        auctionBidButton.setFont(new Font("맑은 고딕", Font.PLAIN, 10));
         auctionBidButton.setEnabled(false);
+        auctionBidButton.setPreferredSize(new Dimension(50, 22));  // 작은 버튼
+        auctionBidButton.setBackground(new Color(220, 220, 220));
         bidPanel.add(auctionBidButton);
         panel.add(bidPanel);
 
@@ -220,11 +356,15 @@ public class MultiGamePanel extends JPanel {
             }
         });
 
-        panel.add(Box.createVerticalStrut(10));
+        panel.add(Box.createVerticalStrut(5));
 
-        // 내 물고기 경매 버튼
+        // 내 물고기 경매 버튼 - 작고 간단하게
         JButton myAuctionButton = new JButton("내 물고기 경매");
+        myAuctionButton.setFont(new Font("맑은 고딕", Font.PLAIN, 10));
         myAuctionButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        myAuctionButton.setPreferredSize(new Dimension(120, 25));
+        myAuctionButton.setMaximumSize(new Dimension(120, 25));
+        myAuctionButton.setBackground(new Color(220, 220, 220));
         myAuctionButton.addActionListener(e -> openMyAuctionDialog());
         panel.add(myAuctionButton);
 
@@ -257,16 +397,16 @@ public class MultiGamePanel extends JPanel {
 
         if (selectedFish == null) return;
 
-        // 시작가 자동 설정 (물고기 가격의 90%)
+        // 시작가 자동 설정 (100%)
         int fishScore = textSource.getFishPrice(selectedFish);
-        int startPrice = (int)(fishScore * 0.9);
+        int startPrice = fishScore;
 
         // 확인 메시지
         int confirm = JOptionPane.showConfirmDialog(
             this,
             selectedFish + "을(를) 경매에 올리시겠습니까?\n" +
             "물고기 가격: " + fishScore + "점\n" +
-            "시작가: " + startPrice + "원 (10% 할인)",
+            "시작가: " + startPrice + "원",
             "경매 확인",
             JOptionPane.YES_NO_OPTION
         );
@@ -295,7 +435,7 @@ public class MultiGamePanel extends JPanel {
             // 로그인 메시지 전송
             sendToServer("/login " + userName);
             
-            appendChat("✅ 서버에 접속했습니다!\n");
+            appendSystemMessage("✅ 서버에 접속했습니다!\n");
 
             // 서버 메시지 수신 스레드
             new Thread(() -> {
@@ -304,7 +444,7 @@ public class MultiGamePanel extends JPanel {
                         String message = dis.readUTF();
                         handleServerMessage(message);
                     } catch (IOException e) {
-                        appendChat("❌ 서버 연결이 끊어졌습니다.\n");
+                        appendSystemMessage("❌ 서버 연결이 끊어졌습니다.\n");
                         break;
                     }
                 }
@@ -312,7 +452,7 @@ public class MultiGamePanel extends JPanel {
 
         } catch (IOException e) {
             e.printStackTrace();
-            appendChat("❌ 서버 연결 실패!\n");
+            appendSystemMessage("❌ 서버 연결 실패!\n");
         }
     }
 
@@ -322,7 +462,7 @@ public class MultiGamePanel extends JPanel {
             dos.writeUTF(message);
             dos.flush();
         } catch (IOException e) {
-            appendChat("❌ 메시지 전송 실패\n");
+            appendSystemMessage("❌ 메시지 전송 실패\n");
         }
     }
 
@@ -330,15 +470,15 @@ public class MultiGamePanel extends JPanel {
     private void handleServerMessage(String message) {
         if (message.startsWith("/chat ")) {
             String chatMsg = message.substring(6);
-            appendChat(chatMsg + "\n");
+            appendChat(chatMsg + "\n");  // 채팅 영역에 추가
             
         } else if (message.startsWith("/catch ")) {
             String catchMsg = message.substring(7);
-            appendChat("🎣 " + catchMsg + "\n");
+            appendActivityLog("🎣 " + catchMsg + "\n");  // 활동 로그에 추가
             
         } else if (message.startsWith("/system ")) {
             String sysMsg = message.substring(8);
-            appendChat("📢 " + sysMsg + "\n");
+            appendSystemMessage("📢 " + sysMsg + "\n");  // 시스템 메시지
             
         } else if (message.startsWith("/auction start ")) {
             String[] parts = message.substring(15).split(" ");
@@ -359,13 +499,13 @@ public class MultiGamePanel extends JPanel {
                 if (currentAuction != null) {
                     currentAuction.placeBid(bidder, bidAmount);
                     updateAuctionInfo();
-                    appendChat("💰 " + bidder + "님이 " + bidAmount + "원 입찰!\n");
+                    appendActivityLog("💰 " + bidder + "님이 " + bidAmount + "원 입찰!\n");  // 활동 로그에 추가
                 }
             }
             
         } else if (message.startsWith("/auction end ")) {
             String endInfo = message.substring(13);
-            appendChat("📢 " + endInfo + "\n");
+            appendActivityLog("📢 " + endInfo + "\n");  // 활동 로그에 추가
             endAuction();
             
         } else {
@@ -380,8 +520,8 @@ public class MultiGamePanel extends JPanel {
         auctionBidButton.setEnabled(!seller.equals(userName));
         updateAuctionInfo();
         
-        appendChat("📢 " + seller + "님이 " + fishName + "(" + fishScore + "점)을 경매에 올렸습니다!\n");
-        appendChat("   시작가: " + startPrice + "원\n");
+        appendActivityLog("📢 " + seller + "님이 " + fishName + "(" + fishScore + "점)을 경매에 올렸습니다!\n");
+        appendActivityLog("   시작가: " + startPrice + "원\n");
         
         if (auctionTimer != null) {
             auctionTimer.stop();
@@ -448,10 +588,157 @@ public class MultiGamePanel extends JPanel {
         }
     }
 
-    // 채팅 영역에 메시지 추가
+    // 시스템 메시지 (회색, 중앙)
+    private void appendSystemMessage(String message) {
+        JLabel label = new JLabel(message.trim());
+        label.setFont(new Font("맑은 고딕", Font.PLAIN, 10));
+        label.setForeground(new Color(150, 150, 150));
+        label.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        chatMessagesPanel.add(label);
+        chatMessagesPanel.add(Box.createVerticalStrut(3));
+        chatMessagesPanel.revalidate();
+        
+        // 스크롤을 맨 아래로
+        SwingUtilities.invokeLater(() -> {
+            JScrollBar vertical = chatScrollPane.getVerticalScrollBar();
+            vertical.setValue(vertical.getMaximum());
+        });
+    }
+    
+    // 플레이어 채팅 (말풍선 스타일)
     private void appendChat(String message) {
-        chatArea.append(message);
-        chatArea.setCaretPosition(chatArea.getText().length());
+        // 메시지 파싱: "이름: 내용" 형식
+        String[] parts = message.split(":", 2);
+        if (parts.length < 2) {
+            appendSystemMessage(message);
+            return;
+        }
+        
+        String senderName = parts[0].trim();
+        String content = parts[1].trim();
+        
+        boolean isMyMessage = senderName.equals(userName);
+        
+        System.out.println("=== 채팅 디버그 ===");
+        System.out.println("발신자: " + senderName);
+        System.out.println("내 이름: " + userName);
+        System.out.println("내 메시지? " + isMyMessage);
+        System.out.println("내용: " + content);
+        
+        // 말풍선 패널
+        JPanel bubblePanel = new JPanel();
+        bubblePanel.setLayout(new BoxLayout(bubblePanel, BoxLayout.Y_AXIS));
+        bubblePanel.setOpaque(true);
+        
+        // 말풍선 배경색
+        if (isMyMessage) {
+            bubblePanel.setBackground(new Color(255, 235, 100));  // 노란색
+        } else {
+            bubblePanel.setBackground(new Color(255, 255, 255));  // 흰색
+        }
+        
+        // 둥근 테두리
+        bubblePanel.setBorder(BorderFactory.createCompoundBorder(
+            new RoundedBorder(15, new Color(200, 200, 200)),
+            BorderFactory.createEmptyBorder(8, 12, 8, 12)
+        ));
+        
+        // 이름 라벨 (상대방만)
+        if (!isMyMessage) {
+            JLabel nameLabel = new JLabel(senderName);
+            nameLabel.setFont(new Font("맑은 고딕", Font.BOLD, 10));
+            nameLabel.setForeground(new Color(100, 100, 100));
+            nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            bubblePanel.add(nameLabel);
+            bubblePanel.add(Box.createVerticalStrut(3));
+        }
+        
+        // 메시지 내용
+        JLabel contentLabel = new JLabel(content);
+        contentLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
+        contentLabel.setForeground(Color.BLACK);
+        contentLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        bubblePanel.add(contentLabel);
+        
+        // Row 패널 (좌우 정렬)
+        JPanel rowPanel = new JPanel();
+        rowPanel.setLayout(new BoxLayout(rowPanel, BoxLayout.X_AXIS));
+        rowPanel.setOpaque(false);
+        rowPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        rowPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
+        
+        if (isMyMessage) {
+            // 내 메시지: 오른쪽
+            rowPanel.add(Box.createHorizontalGlue());
+            rowPanel.add(bubblePanel);
+            rowPanel.add(Box.createHorizontalStrut(10));
+        } else {
+            // 상대 메시지: 왼쪽
+            rowPanel.add(Box.createHorizontalStrut(10));
+            rowPanel.add(bubblePanel);
+            rowPanel.add(Box.createHorizontalGlue());
+        }
+        
+        chatMessagesPanel.add(rowPanel);
+        chatMessagesPanel.add(Box.createVerticalStrut(3));
+        chatMessagesPanel.revalidate();
+        chatMessagesPanel.repaint();
+        
+        // 스크롤을 맨 아래로
+        SwingUtilities.invokeLater(() -> {
+            JScrollBar vertical = chatScrollPane.getVerticalScrollBar();
+            vertical.setValue(vertical.getMaximum());
+        });
+    }
+    
+    // 둥근 테두리 클래스
+    class RoundedBorder extends AbstractBorder {
+        private int radius;
+        private Color color;
+        
+        RoundedBorder(int radius, Color color) {
+            this.radius = radius;
+            this.color = color;
+        }
+        
+        @Override
+        public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius);
+            g2.dispose();
+        }
+        
+        @Override
+        public Insets getBorderInsets(Component c) {
+            return new Insets(2, 2, 2, 2);
+        }
+    }
+    
+    // 활동 로그 추가
+    private void appendActivityLog(String message) {
+        appendToPane(activityLog, message, new Color(120, 120, 120), 10, false);
+    }
+    
+    // JTextPane에 스타일이 적용된 텍스트 추가
+    private void appendToPane(JTextPane pane, String message, Color color, int fontSize, boolean bold) {
+        try {
+            StyledDocument doc = pane.getStyledDocument();
+            SimpleAttributeSet style = new SimpleAttributeSet();
+            
+            StyleConstants.setFontFamily(style, "맑은 고딕");
+            StyleConstants.setFontSize(style, fontSize);
+            StyleConstants.setForeground(style, color);
+            StyleConstants.setBold(style, bold);
+            
+            doc.insertString(doc.getLength(), message, style);
+            pane.setCaretPosition(doc.getLength());
+            
+        } catch (BadLocationException e) {
+            e.printStackTrace();
+        }
     }
 
     private void checkLevelUp() {
@@ -490,13 +777,25 @@ public class MultiGamePanel extends JPanel {
 
         fishCaught = 0;
         resetGame();
+        
+        // 타이틀바 업데이트
+        updateFrameTitle();
 
-        JOptionPane.showMessageDialog(this, 
-            "레벨 업! " + level + " 레벨이 시작됩니다! 목표: " + levelGoals.get(level) + "개의 물고기 잡기!");
+        JOptionPane.showMessageDialog(this,
+            "레벨 업! 난이도: " + level + "\n새로운 도전을 시작합니다!");
 
         Timer timer = new Timer(3000, e -> startGame());
         timer.setRepeats(false);
         timer.start();
+    }
+    
+    // 프레임 타이틀 업데이트 메서드
+    private void updateFrameTitle() {
+        Window window = SwingUtilities.getWindowAncestor(this);
+        if (window instanceof JFrame) {
+            JFrame frame = (JFrame) window;
+            frame.setTitle(userName + "의 멀티플레이어 Fishing - 난이도: " + level);
+        }
     }
 
     private int getFallingSpeed(String level) {
@@ -509,6 +808,16 @@ public class MultiGamePanel extends JPanel {
     }
 
     public void startGame() {
+        // 게임 시작 목표 안내 추가
+        int goal = levelGoals.get(level);
+        JOptionPane.showMessageDialog(this, 
+            "🎣 낚시 게임 시작!\n\n" +
+            "난이도: " + level + "\n" +
+            "목표: 물고기 " + goal + "마리 잡기\n\n" +
+            "행운을 빕니다!",
+            "게임 목표", 
+            JOptionPane.INFORMATION_MESSAGE);
+
         if (isPaused) {
             isPaused = false;
             if (gameTimer != null) gameTimer.start();
@@ -588,7 +897,7 @@ public class MultiGamePanel extends JPanel {
 
                     if (lifePanel.isGameOver()) {
                         stopGame(false);
-                        showGameOver(); // ← 변경됨!
+                        showGameOver();
                     }
                 }
             }
@@ -616,10 +925,8 @@ public class MultiGamePanel extends JPanel {
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 if (gameOverImage != null) {
-                    // 이미지를 패널 크기에 맞게 그리기
                     g.drawImage(gameOverImage, 0, 0, getWidth(), getHeight(), this);
                 } else {
-                    // 이미지 로드 실패 시 반투명 배경
                     Graphics2D g2d = (Graphics2D) g;
                     g2d.setColor(new Color(0, 0, 0, 180));
                     g2d.fillRect(0, 0, getWidth(), getHeight());
@@ -630,7 +937,6 @@ public class MultiGamePanel extends JPanel {
         gameOverPanel.setLayout(null);
         gameOverPanel.setBounds(0, 0, ground.getWidth(), ground.getHeight());
         
-        // 투명 버튼 (이미지의 MAIN MENU 버튼 위치에 배치)
         JButton menuButton = new JButton();
         menuButton.setOpaque(false);
         menuButton.setContentAreaFilled(false);
@@ -639,17 +945,13 @@ public class MultiGamePanel extends JPanel {
         menuButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
         menuButton.addActionListener(e -> goToMainMenu());
         
-        // 이미지 비율에 맞게 버튼 위치 계산
-        // 원본 이미지: 847x924
-        // MAIN MENU 버튼 위치: 중앙 약간 위쪽
         int panelWidth = ground.getWidth();
         int panelHeight = ground.getHeight();
         
-        // 이미지 비율로 버튼 위치 계산
-        int buttonWidth = (int)(panelWidth * 0.4);   // 화면의 40%
-        int buttonHeight = (int)(panelHeight * 0.08); // 화면의 8%
-        int x = (panelWidth - buttonWidth) / 2;       // 중앙 정렬
-        int y = (int)(panelHeight * 0.45);            // 화면의 45% 위치
+        int buttonWidth = (int)(panelWidth * 0.4);
+        int buttonHeight = (int)(panelHeight * 0.08);
+        int x = (panelWidth - buttonWidth) / 2;
+        int y = (int)(panelHeight * 0.45);
         
         menuButton.setBounds(x, y, buttonWidth, buttonHeight);
         
