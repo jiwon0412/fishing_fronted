@@ -204,7 +204,12 @@ public class MultiGamePanel extends JPanel {
         chatMessagesPanel.setOpaque(false);
         chatMessagesPanel.setAlignmentY(Component.TOP_ALIGNMENT);
         
-        chatScrollPane = new JScrollPane(chatMessagesPanel);
+        // 채팅 영역을 감싸는 컨테이너 (너비 고정)
+        JPanel chatContainer = new JPanel(new BorderLayout());
+        chatContainer.setOpaque(false);
+        chatContainer.add(chatMessagesPanel, BorderLayout.NORTH);
+        
+        chatScrollPane = new JScrollPane(chatContainer);
         chatScrollPane.setBorder(null);
         chatScrollPane.setPreferredSize(new Dimension(280, 200));
         chatScrollPane.setOpaque(false);
@@ -251,16 +256,16 @@ public class MultiGamePanel extends JPanel {
 
         panel.add(chatSection, BorderLayout.NORTH);
 
-        // === 하단: 활동 로그 영역 ===
+        // === 하단: 활동 로그 영역 (간격 제거!) ===
         JPanel activitySection = new JPanel(new BorderLayout());
         activitySection.setOpaque(false);
-        activitySection.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
+        activitySection.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));  // 위쪽 간격 0
         
         JLabel activityLabel = new JLabel("📊 활동 로그", JLabel.CENTER);
-        activityLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 11));
-        activityLabel.setForeground(new Color(120, 120, 120));
+        activityLabel.setFont(new Font("맑은 고딕", Font.BOLD, 11));  // Bold로 변경
+        activityLabel.setForeground(new Color(0, 0, 0));  // 검정색으로 변경
         activityLabel.setOpaque(false);
-        activityLabel.setBorder(BorderFactory.createEmptyBorder(3, 5, 3, 5));
+        activityLabel.setBorder(BorderFactory.createEmptyBorder(0, 5, 3, 5));  // 위쪽 간격 0
         activitySection.add(activityLabel, BorderLayout.NORTH);
 
         activityLog.setEditable(false);
@@ -321,9 +326,9 @@ public class MultiGamePanel extends JPanel {
         bidPanel.add(auctionBidField);
         
         auctionBidButton = new JButton("입찰");
-        auctionBidButton.setFont(new Font("맑은 고딕", Font.PLAIN, 10));
+        auctionBidButton.setFont(new Font("맑은 고딕", Font.PLAIN, 10));  // 폰트 크기 10으로 축소
         auctionBidButton.setEnabled(false);
-        auctionBidButton.setPreferredSize(new Dimension(50, 22));  // 작은 버튼
+        auctionBidButton.setPreferredSize(new Dimension(55, 25));
         auctionBidButton.setBackground(new Color(220, 220, 220));
         bidPanel.add(auctionBidButton);
         panel.add(bidPanel);
@@ -358,15 +363,19 @@ public class MultiGamePanel extends JPanel {
 
         panel.add(Box.createVerticalStrut(5));
 
-        // 내 물고기 경매 버튼 - 작고 간단하게
+        // 내 물고기 경매 버튼 - 중앙 정렬
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        buttonPanel.setBackground(new Color(240, 240, 240));
+        buttonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
         JButton myAuctionButton = new JButton("내 물고기 경매");
         myAuctionButton.setFont(new Font("맑은 고딕", Font.PLAIN, 10));
-        myAuctionButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         myAuctionButton.setPreferredSize(new Dimension(120, 25));
-        myAuctionButton.setMaximumSize(new Dimension(120, 25));
         myAuctionButton.setBackground(new Color(220, 220, 220));
         myAuctionButton.addActionListener(e -> openMyAuctionDialog());
-        panel.add(myAuctionButton);
+        
+        buttonPanel.add(myAuctionButton);
+        panel.add(buttonPanel);
 
         return panel;
     }
@@ -420,6 +429,9 @@ public class MultiGamePanel extends JPanel {
         } else {
             myInventory.put(selectedFish, count - 1);
         }
+        
+        // 그물망에서도 제거!
+        scorePanel.removeCaughtFish(selectedFish);
 
         // 서버에 경매 시작 알림
         sendToServer("/auction start " + selectedFish + " " + fishScore + " " + startPrice);
@@ -505,7 +517,47 @@ public class MultiGamePanel extends JPanel {
             
         } else if (message.startsWith("/auction end ")) {
             String endInfo = message.substring(13);
-            appendActivityLog("📢 " + endInfo + "\n");  // 활동 로그에 추가
+            appendActivityLog("📢 " + endInfo + "\n");
+            
+            // 낙찰 정보 파싱
+            if (endInfo.contains("님이") && endInfo.contains("원에 낙찰!")) {
+                // "winner님이 1000원에 낙찰!" 형식
+                String[] parts = endInfo.split("님이 ");
+                if (parts.length >= 2) {
+                    String winner = parts[0].trim();
+                    String priceStr = parts[1].split("원에")[0].trim();
+                    
+                    try {
+                        int price = Integer.parseInt(priceStr);
+                        
+                        // 낙찰자 = 나 → 돈 차감 + 그물망에 추가
+                        if (winner.equals(userName)) {
+                            if (scorePanel.spendMoney(price)) {
+                                appendActivityLog("💰 " + price + "원을 지불했습니다.\n");
+                                
+                                // 경매된 물고기 이름 가져오기
+                                if (currentAuction != null) {
+                                    String fishName = currentAuction.getFishName();
+                                    myInventory.put(fishName, myInventory.getOrDefault(fishName, 0) + 1);
+                                    scorePanel.addCaughtFish(fishName);  // 그물망에도 추가! ✅
+                                    appendActivityLog("🎣 " + fishName + "을(를) 획득했습니다!\n");
+                                }
+                            } else {
+                                appendActivityLog("⚠️ 돈이 부족했지만 낙찰되었습니다!\n");
+                            }
+                        }
+                        
+                        // 판매자 = 나 → 돈 추가
+                        if (currentAuction != null && currentAuction.getSeller().equals(userName)) {
+                            scorePanel.addMoney(price);
+                            appendActivityLog("💰 " + price + "원을 받았습니다.\n");
+                        }
+                    } catch (NumberFormatException e) {
+                        System.out.println("가격 파싱 오류: " + priceStr);
+                    }
+                }
+            }
+            
             endAuction();
             
         } else {
@@ -545,12 +597,19 @@ public class MultiGamePanel extends JPanel {
                         sendToServer("/auction end " + winner + "님이 " + finalPrice + "원에 낙찰!");
                         
                         if (winner.equals(userName)) {
-                            scorePanel.spendMoney(finalPrice);
-                            myInventory.put(fish, myInventory.getOrDefault(fish, 0) + 1);
+                            // 돈 차감
+                            if (scorePanel.spendMoney(finalPrice)) {
+                                myInventory.put(fish, myInventory.getOrDefault(fish, 0) + 1);
+                                scorePanel.addCaughtFish(fish);  // 그물망에도 추가! ✅
+                                appendActivityLog("✅ 물고기를 구매했습니다!\n");
+                            } else {
+                                appendActivityLog("⚠️ 돈이 부족하여 구매할 수 없습니다!\n");
+                            }
                         }
                         
                         if (seller2.equals(userName)) {
                             scorePanel.addMoney(finalPrice);
+                            appendActivityLog("💰 물고기를 판매했습니다!\n");
                         }
                     }
                     
@@ -591,8 +650,8 @@ public class MultiGamePanel extends JPanel {
     // 시스템 메시지 (회색, 중앙)
     private void appendSystemMessage(String message) {
         JLabel label = new JLabel(message.trim());
-        label.setFont(new Font("맑은 고딕", Font.PLAIN, 10));
-        label.setForeground(new Color(150, 150, 150));
+        label.setFont(new Font("맑은 고딕", Font.BOLD, 10));  // Bold로 변경
+        label.setForeground(new Color(0x0066CC));  // 진한 파란색 (잘 보임)
         label.setAlignmentX(Component.CENTER_ALIGNMENT);
         
         chatMessagesPanel.add(label);
@@ -648,7 +707,7 @@ public class MultiGamePanel extends JPanel {
         if (!isMyMessage) {
             JLabel nameLabel = new JLabel(senderName);
             nameLabel.setFont(new Font("맑은 고딕", Font.BOLD, 10));
-            nameLabel.setForeground(new Color(100, 100, 100));
+            nameLabel.setForeground(new Color(0x333333));  // 진한 회색 (거의 검정)
             nameLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
             bubblePanel.add(nameLabel);
             bubblePanel.add(Box.createVerticalStrut(3));
@@ -657,7 +716,7 @@ public class MultiGamePanel extends JPanel {
         // 메시지 내용
         JLabel contentLabel = new JLabel(content);
         contentLabel.setFont(new Font("맑은 고딕", Font.PLAIN, 12));
-        contentLabel.setForeground(Color.BLACK);
+        contentLabel.setForeground(new Color(0x000000));  // 검정색
         contentLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         bubblePanel.add(contentLabel);
         
@@ -719,7 +778,7 @@ public class MultiGamePanel extends JPanel {
     
     // 활동 로그 추가
     private void appendActivityLog(String message) {
-        appendToPane(activityLog, message, new Color(120, 120, 120), 10, false);
+        appendToPane(activityLog, message, new Color(0, 0, 0), 10, false);  // 검정색으로 변경
     }
     
     // JTextPane에 스타일이 적용된 텍스트 추가
@@ -747,11 +806,12 @@ public class MultiGamePanel extends JPanel {
             stopGame(false);
 
             if (level.equals("어려움")) {
-                JOptionPane.showMessageDialog(this, 
-                    "축하합니다! 낚시왕이 되셨습니다! 최종 점수: " + scorePanel.getScore());
+                // 3단계 완료 - 낚시왕!
+                showFishingKing();
                 return;
             }
 
+            // 1, 2단계 완료 - 다음 단계로 갈지 선택
             int result = JOptionPane.showConfirmDialog(this, 
                 "목표를 달성했습니다! 다음 단계도 도전하겠습니까?",
                 "레벨 업", JOptionPane.YES_NO_OPTION);
@@ -759,8 +819,8 @@ public class MultiGamePanel extends JPanel {
             if (result == JOptionPane.YES_OPTION) {
                 levelUp();
             } else {
-                JOptionPane.showMessageDialog(this, 
-                    "게임 종료! 최종 점수: " + scorePanel.getScore());
+                // 포기 선택 - Quit.png 표시
+                showQuit();
             }
         }
     }
@@ -776,7 +836,7 @@ public class MultiGamePanel extends JPanel {
         }
 
         fishCaught = 0;
-        resetGame();
+        resetGameField();  // 점수/돈/그물망 유지하고 화면만 초기화
         
         // 타이틀바 업데이트
         updateFrameTitle();
@@ -840,13 +900,26 @@ public class MultiGamePanel extends JPanel {
         }
 
         if (showStopMessage) {
-            JOptionPane.showMessageDialog(this, "게임이 일시 정지되었습니다.");
+            // Keep_Going.png 표시
+            showKeepGoing();
         }
     }
 
     private void resetGame() {
         scorePanel.reset();
         lifePanel.resetLives();
+        fallingLabels.clear();
+        fallingTimers.clear();
+        labelPositions.clear();
+        ground.removeAll();
+        input.setText("");
+        ground.setBackgroundImage(level);
+    }
+    
+    // 레벨업 시 사용: 점수/돈/그물망 유지하고 화면만 초기화
+    private void resetGameField() {
+        // scorePanel.reset() 호출 안 함! (점수/돈/그물망 유지)
+        lifePanel.resetLives();  // 목숨만 초기화
         fallingLabels.clear();
         fallingTimers.clear();
         labelPositions.clear();
@@ -907,6 +980,226 @@ public class MultiGamePanel extends JPanel {
     }
 
     // ========== 게임오버 화면 메서드들 ==========
+    
+    // Keep Going 화면 표시 (일시 정지)
+    private void showKeepGoing() {
+        gameOverPanel = new JPanel() {
+            private Image keepGoingImage;
+            
+            {
+                try {
+                    keepGoingImage = new ImageIcon("Keep_Going.png").getImage();
+                } catch (Exception e) {
+                    System.out.println("Keep_Going.png 이미지를 불러올 수 없습니다");
+                    e.printStackTrace();
+                }
+            }
+            
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (keepGoingImage != null) {
+                    g.drawImage(keepGoingImage, 0, 0, getWidth(), getHeight(), this);
+                } else {
+                    Graphics2D g2d = (Graphics2D) g;
+                    g2d.setColor(new Color(100, 200, 255, 200));
+                    g2d.fillRect(0, 0, getWidth(), getHeight());
+                    
+                    g2d.setColor(Color.BLACK);
+                    g2d.setFont(new Font("맑은 고딕", Font.BOLD, 40));
+                    String text = "KEEP GOING?";
+                    FontMetrics fm = g2d.getFontMetrics();
+                    int x = (getWidth() - fm.stringWidth(text)) / 2;
+                    int y = getHeight() / 2;
+                    g2d.drawString(text, x, y);
+                }
+            }
+        };
+        gameOverPanel.setOpaque(false);
+        gameOverPanel.setLayout(null);
+        gameOverPanel.setBounds(0, 0, ground.getWidth(), ground.getHeight());
+        
+        // CONTINUE 버튼 (Keep_Going.png의 버튼 위치에 맞게)
+        JButton continueButton = new JButton();
+        continueButton.setOpaque(false);
+        continueButton.setContentAreaFilled(false);
+        continueButton.setBorderPainted(false);
+        continueButton.setFocusPainted(false);
+        continueButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        continueButton.addActionListener(e -> {
+            hideKeepGoing();
+            resumeGame();
+        });
+        
+        int panelWidth = ground.getWidth();
+        int panelHeight = ground.getHeight();
+        
+        int buttonWidth = (int)(panelWidth * 0.45);
+        int buttonHeight = (int)(panelHeight * 0.08);
+        int x = (panelWidth - buttonWidth) / 2;
+        int y = (int)(panelHeight * 0.42);  // 위로 올림 (화면의 42% 지점)
+        
+        continueButton.setBounds(x, y, buttonWidth, buttonHeight);
+        
+        gameOverPanel.add(continueButton);
+        
+        ground.setLayout(null);
+        ground.add(gameOverPanel);
+        ground.setComponentZOrder(gameOverPanel, 0);
+        ground.revalidate();
+        ground.repaint();
+    }
+    
+    // Keep Going 화면 숨기기
+    private void hideKeepGoing() {
+        if (gameOverPanel != null) {
+            ground.remove(gameOverPanel);
+            gameOverPanel = null;
+            ground.revalidate();
+            ground.repaint();
+        }
+    }
+    
+    // 게임 재개
+    private void resumeGame() {
+        isPaused = false;
+        if (gameTimer != null) gameTimer.start();
+        for (Timer timer : fallingTimers) {
+            timer.start();
+        }
+    }
+    
+    // 낚시왕 화면 표시 (3단계 완료)
+    private void showFishingKing() {
+        gameOverPanel = new JPanel() {
+            private Image fishingKingImage;
+            
+            {
+                try {
+                    fishingKingImage = new ImageIcon("FishingKing.png").getImage();
+                } catch (Exception e) {
+                    System.out.println("FishingKing.png 이미지를 불러올 수 없습니다");
+                    e.printStackTrace();
+                }
+            }
+            
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (fishingKingImage != null) {
+                    g.drawImage(fishingKingImage, 0, 0, getWidth(), getHeight(), this);
+                } else {
+                    Graphics2D g2d = (Graphics2D) g;
+                    g2d.setColor(new Color(173, 216, 230, 200));
+                    g2d.fillRect(0, 0, getWidth(), getHeight());
+                    
+                    g2d.setColor(Color.BLACK);
+                    g2d.setFont(new Font("맑은 고딕", Font.BOLD, 40));
+                    String text = "YOU ARE FISHING KING!";
+                    FontMetrics fm = g2d.getFontMetrics();
+                    int x = (getWidth() - fm.stringWidth(text)) / 2;
+                    int y = getHeight() / 2;
+                    g2d.drawString(text, x, y);
+                }
+            }
+        };
+        gameOverPanel.setOpaque(false);
+        gameOverPanel.setLayout(null);
+        gameOverPanel.setBounds(0, 0, ground.getWidth(), ground.getHeight());
+        
+        // MAIN MENU 버튼 (FishingKing.png의 버튼 위치에 맞게)
+        JButton menuButton = new JButton();
+        menuButton.setOpaque(false);
+        menuButton.setContentAreaFilled(false);
+        menuButton.setBorderPainted(false);
+        menuButton.setFocusPainted(false);
+        menuButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        menuButton.addActionListener(e -> goToMainMenu());
+        
+        int panelWidth = ground.getWidth();
+        int panelHeight = ground.getHeight();
+        
+        int buttonWidth = (int)(panelWidth * 0.4);
+        int buttonHeight = (int)(panelHeight * 0.08);
+        int x = (panelWidth - buttonWidth) / 2;
+        int y = (int)(panelHeight * 0.3);  // FishingKing.png의 버튼 위치
+        
+        menuButton.setBounds(x, y, buttonWidth, buttonHeight);
+        
+        gameOverPanel.add(menuButton);
+        
+        ground.setLayout(null);
+        ground.add(gameOverPanel);
+        ground.setComponentZOrder(gameOverPanel, 0);
+        ground.revalidate();
+        ground.repaint();
+    }
+    
+    // Quit 화면 표시 (중도 포기)
+    private void showQuit() {
+        gameOverPanel = new JPanel() {
+            private Image quitImage;
+            
+            {
+                try {
+                    quitImage = new ImageIcon("Quit.png").getImage();
+                } catch (Exception e) {
+                    System.out.println("Quit.png 이미지를 불러올 수 없습니다");
+                    e.printStackTrace();
+                }
+            }
+            
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (quitImage != null) {
+                    g.drawImage(quitImage, 0, 0, getWidth(), getHeight(), this);
+                } else {
+                    Graphics2D g2d = (Graphics2D) g;
+                    g2d.setColor(new Color(173, 216, 230, 200));
+                    g2d.fillRect(0, 0, getWidth(), getHeight());
+                    
+                    g2d.setColor(Color.BLACK);
+                    g2d.setFont(new Font("맑은 고딕", Font.BOLD, 40));
+                    String text = "TO BE CONTINUE";
+                    FontMetrics fm = g2d.getFontMetrics();
+                    int x = (getWidth() - fm.stringWidth(text)) / 2;
+                    int y = getHeight() / 2;
+                    g2d.drawString(text, x, y);
+                }
+            }
+        };
+        gameOverPanel.setOpaque(false);
+        gameOverPanel.setLayout(null);
+        gameOverPanel.setBounds(0, 0, ground.getWidth(), ground.getHeight());
+        
+        // MAIN MENU 버튼 (Quit.png의 버튼 위치에 맞게 - 중앙)
+        JButton menuButton = new JButton();
+        menuButton.setOpaque(false);
+        menuButton.setContentAreaFilled(false);
+        menuButton.setBorderPainted(false);
+        menuButton.setFocusPainted(false);
+        menuButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        menuButton.addActionListener(e -> goToMainMenu());
+        
+        int panelWidth = ground.getWidth();
+        int panelHeight = ground.getHeight();
+        
+        int buttonWidth = (int)(panelWidth * 0.35);
+        int buttonHeight = (int)(panelHeight * 0.08);
+        int x = (panelWidth - buttonWidth) / 2;
+        int y = (int)(panelHeight * 0.48);  // 중앙 위치로 수정 (화면의 48% 지점)
+        
+        menuButton.setBounds(x, y, buttonWidth, buttonHeight);
+        
+        gameOverPanel.add(menuButton);
+        
+        ground.setLayout(null);
+        ground.add(gameOverPanel);
+        ground.setComponentZOrder(gameOverPanel, 0);
+        ground.revalidate();
+        ground.repaint();
+    }
     
     private void showGameOver() {
         gameOverPanel = new JPanel() {

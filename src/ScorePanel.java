@@ -23,16 +23,25 @@ public class ScorePanel extends JPanel {
     private JPanel caughtFishPanel = new JPanel(); // 잡힌 물고기 이름을 표시할 패널
     private JScrollPane scrollPane; // 스크롤 패널 추가
     private Map<String, Integer> caughtFishCount = new HashMap<>(); // 물고기 이름과 그 물고기가 잡힌 횟수를 저장하는 맵
-    private Image backgroundImage; // 배경 이미지
+    private Image backgroundImage; // 배경 이미지 (NetBG.png)
+    private Image netImage; // 그물망 이미지 (Net.png)
 
     private Map<String, Integer> fishPrices = new HashMap<>(); // 물고기 이름과 가격을 저장하는 맵
 
     public ScorePanel() {
-        // 배경 이미지 로드
+        // 배경 이미지 로드 (NetBG.png)
         try {
-            backgroundImage = new ImageIcon("Net.jpg").getImage();
+            backgroundImage = new ImageIcon("NetBG.png").getImage();
         } catch (Exception e) {
-            System.out.println("Net.jpg 이미지를 불러올 수 없습니다");
+            System.out.println("NetBG.png 이미지를 불러올 수 없습니다");
+            e.printStackTrace();
+        }
+        
+        // 그물망 이미지 로드 (Net.png)
+        try {
+            netImage = new ImageIcon("Net.png").getImage();
+        } catch (Exception e) {
+            System.out.println("Net.png 이미지를 불러올 수 없습니다");
             e.printStackTrace();
         }
         
@@ -97,6 +106,22 @@ public class ScorePanel extends JPanel {
     // 잡힌 물고기 표시 메소드
     public void addCaughtFish(String fishName) {
         caughtFishCount.put(fishName, caughtFishCount.getOrDefault(fishName, 0) + 1);
+        updateCaughtFishDisplay();
+    }
+    
+    // 물고기 제거 메소드 (경매 시)
+    public void removeCaughtFish(String fishName) {
+        int count = caughtFishCount.getOrDefault(fishName, 0);
+        if (count > 1) {
+            caughtFishCount.put(fishName, count - 1);
+        } else if (count == 1) {
+            caughtFishCount.remove(fishName);
+        }
+        updateCaughtFishDisplay();
+    }
+    
+    // 그물망 화면 업데이트
+    private void updateCaughtFishDisplay() {
         caughtFishPanel.removeAll(); // 기존 레이블 삭제
 
         // 잡힌 모든 물고기 이름과 개수를 레이블로 추가
@@ -168,13 +193,19 @@ public class ScorePanel extends JPanel {
         return false; // 돈이 부족함
     }
     
-    // 배경 이미지 그리기
+    // 배경 이미지와 그물망 이미지 그리기
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
+        
+        // 1. 배경 이미지 그리기 (NetBG.png)
         if (backgroundImage != null) {
-            // 이미지를 패널 크기에 맞게 그리기
             g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
+        }
+        
+        // 2. 그물망 이미지 그리기 (Net.png)
+        if (netImage != null) {
+            g.drawImage(netImage, 0, 0, getWidth(), getHeight(), this);
         }
     }
 }
