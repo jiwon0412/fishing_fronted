@@ -4,19 +4,31 @@ import java.awt.*;
 public class LifePanel extends JPanel {
     private int lives = 3; // 시작 시 목숨 3개
     private Image baitImage; // 목숨 이미지를 위한 이미지 객체
+    private Image backgroundImage; // 배경 이미지
 
     public LifePanel() {
         // "bait.png" 이미지를 로드하여 아이콘 설정
         ImageIcon baitIcon = new ImageIcon("bait.png");
         baitImage = baitIcon.getImage();  // 이미지 객체로 변환하여 사용
+        
+        // 배경 이미지 로드
+        try {
+            backgroundImage = new ImageIcon("baitBG.png").getImage();
+        } catch (Exception e) {
+            System.out.println("baitBG.png 이미지를 불러올 수 없습니다");
+        }
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         
-        // 배경 그리기 (필요한 경우)
-        setBackground(Color.WHITE);
+        // 배경 이미지 그리기
+        if (backgroundImage != null) {
+            g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
+        } else {
+            setBackground(Color.WHITE);
+        }
 
         // 패널의 크기
         int panelWidth = getWidth();
@@ -36,8 +48,8 @@ public class LifePanel extends JPanel {
         g.drawString(text, textX, textY);  // 텍스트 그리기
 
         // 목숨을 세로로 정렬하려면 yOffset 위치를 수정
-        int imageWidth = 60;  // 이미지 가로 크기
-        int imageHeight = 60;  // 이미지 세로 크기
+        int imageWidth = (int)(60 * 0.7);  // 이미지 가로 크기 (0.7배 = 42px)
+        int imageHeight = (int)(60 * 0.7);  // 이미지 세로 크기 (0.7배 = 42px)
         int totalHeight = imageHeight * lives + 10 * (lives - 1);  // 총 이미지 세로 크기 (이미지 간격 포함)
         int startY = (panelHeight - totalHeight) / 2;  // 이미지의 시작 Y 위치를 중앙으로 설정
         int xOffset = (panelWidth - imageWidth) / 2;  // 이미지를 가로 중앙으로 정렬
