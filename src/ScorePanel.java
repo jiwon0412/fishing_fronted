@@ -2,210 +2,191 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Image;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.ImageIcon;
+import javax.swing.*;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+// 점수와 잡은 물고기를 표시하는 패널 클래스
 public class ScorePanel extends JPanel {
-    private int score = 0; // 현재 점수를 저장하는 변수
-    private int money = 0; // 경매용 돈 (점수와 동일하게 시작)
-    private JLabel moneyLabel = new JLabel("0원");
-    private JLabel textLabel = new JLabel("< 그물망 >");
-    private JLabel scoreLabel = new JLabel(Integer.toString(score));
-    private JPanel caughtFishPanel = new JPanel(); // 잡힌 물고기 이름을 표시할 패널
-    private JScrollPane scrollPane; // 스크롤 패널 추가
-    private Map<String, Integer> caughtFishCount = new HashMap<>(); // 물고기 이름과 그 물고기가 잡힌 횟수를 저장하는 맵
-    private Image backgroundImage; // 배경 이미지 (NetBG.png)
-    private Image netImage; // 그물망 이미지 (Net.png)
 
-    private Map<String, Integer> fishPrices = new HashMap<>(); // 물고기 이름과 가격을 저장하는 맵
+    private int score = 0; // 점수 = 돈 통합
+    private JLabel moneyLabel = new JLabel("0원"); // 보유 금액 라벨
+    private JLabel titleLabel = new JLabel("< 그물망 >"); // 제목 라벨
 
+    private JPanel caughtFishPanel = new JPanel(); // 잡은 물고기 목록 패널
+    private JScrollPane scrollPane; // 스크롤 가능한 패널
+
+    private Map<String, Integer> caughtFishCount = new HashMap<>(); // 물고기 이름과 개수 저장
+    private Map<String, Integer> fishPrices = new HashMap<>(); // 물고기 이름과 가격 저장
+
+    private Image backgroundImage; // 배경 이미지
+    private Image netImage; // 그물망 이미지
+
+    // 생성자 - UI 초기화 및 물고기 가격 로드
     public ScorePanel() {
-        // 배경 이미지 로드 (NetBG.png)
-        try {
-            backgroundImage = new ImageIcon("NetBG.png").getImage();
-        } catch (Exception e) {
-            System.out.println("NetBG.png 이미지를 불러올 수 없습니다");
-            e.printStackTrace();
-        }
-        
-        // 그물망 이미지 로드 (Net.png)
-        try {
-            netImage = new ImageIcon("Net.png").getImage();
-        } catch (Exception e) {
-            System.out.println("Net.png 이미지를 불러올 수 없습니다");
-            e.printStackTrace();
-        }
-        
-    	 // 레이아웃 설정: Y축으로 컴포넌트가 쌓이도록 설정
+
+        // 배경 이미지 로드
+        try { backgroundImage = new ImageIcon("NetBG.png").getImage(); } catch (Exception e) {}
+        // 그물망 이미지 로드
+        try { netImage = new ImageIcon("Net.png").getImage(); } catch (Exception e) {}
+
+        // Y축 방향 박스 레이아웃 설정
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        setOpaque(false); // 패널을 투명하게 설정
+        setOpaque(false); // 투명 배경
 
-        // 점수 텍스트 레이블 설정
-        textLabel.setFont(new Font("맑은 고딕", Font.BOLD, 20));
-        textLabel.setForeground(Color.DARK_GRAY);
-        textLabel.setOpaque(false); // 투명하게
-        add(textLabel);
+        // 제목 라벨 설정 및 추가
+        titleLabel.setFont(new Font("맑은 고딕", Font.BOLD, 20));
+        titleLabel.setForeground(Color.DARK_GRAY);
+        add(titleLabel);
 
-        // 점수 값 레이블 설정
-        scoreLabel.setFont(new Font("맑은 고딕", Font.BOLD, 20));
-        scoreLabel.setForeground(Color.RED);
-        scoreLabel.setOpaque(false); // 투명하게
-        add(scoreLabel);
+        add(Box.createVerticalStrut(5)); // 5픽셀 간격
 
-        add(Box.createVerticalStrut(10)); // 간격 추가
-     // 돈 표시 추가
-        JLabel moneyTextLabel = new JLabel("💰 보유 금액:");
-        moneyTextLabel.setFont(new Font("맑은 고딕", Font.BOLD, 16));
-        moneyTextLabel.setForeground(Color.DARK_GRAY);
-        moneyTextLabel.setOpaque(false); // 투명하게
-        add(moneyTextLabel);
-
-        moneyLabel.setFont(new Font("맑은 고딕", Font.BOLD, 18));
+        // 보유 금액 라벨 설정 및 추가
+        moneyLabel.setFont(new Font("맑은 고딕", Font.BOLD, 20));
         moneyLabel.setForeground(Color.BLUE);
-        moneyLabel.setOpaque(false); // 투명하게
         add(moneyLabel);
-        add(Box.createVerticalStrut(10));
 
-        // 잡힌 물고기 패널 설정
+        add(Box.createVerticalStrut(10)); // 10픽셀 간격
+
+        // 잡은 물고기 목록 패널 설정
         caughtFishPanel.setLayout(new BoxLayout(caughtFishPanel, BoxLayout.Y_AXIS));
-        caughtFishPanel.setOpaque(false); // 투명하게
-        
-        // 스크롤 패널로 감싸기
+        caughtFishPanel.setOpaque(false); // 투명 배경
+
+        // 스크롤 패널 설정 및 추가
         scrollPane = new JScrollPane(caughtFishPanel);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED); // 필요시 세로 스크롤바
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER); // 가로 스크롤바 없음
+        scrollPane.setOpaque(false); // 투명 배경
+        scrollPane.getViewport().setOpaque(false);
         scrollPane.setBorder(null); // 테두리 제거
-        scrollPane.setOpaque(false); // 스크롤 패널 투명하게
-        scrollPane.getViewport().setOpaque(false); // 뷰포트도 투명하게
+
         add(scrollPane);
 
-        // 물고기 가격 로드
+        // 파일에서 물고기 가격 로드
         loadFishPricesFromFile("fish_prices.txt");
     }
 
-    // 점수 증가 메소드
-    public void increase(String word) {
-        Integer fishPrice = fishPrices.get(word);
+    // 물고기를 잡았을 때 점수/돈 증가
+    public void increase(String fishName) {
+        Integer fishPrice = fishPrices.get(fishName); // 물고기 가격 조회
         if (fishPrice != null) {
-            score += fishPrice;
-            money += fishPrice; // 돈도 같이 증가!
-            scoreLabel.setText(Integer.toString(score));
-            moneyLabel.setText(money + "원");
+            score += fishPrice; // 점수에 가격 추가
+            updateLabels(); // UI 업데이트
         }
     }
-    
-    // 잡힌 물고기 표시 메소드
+
+    // 점수 UI 갱신
+    private void updateLabels() {
+        moneyLabel.setText(score + "원");
+    }
+
+    // 돈(=점수) 사용 - 충분한 금액이 있으면 true 반환
+    public boolean spendScore(int amount) {
+        if (score >= amount) {
+            score -= amount; // 점수 차감
+            updateLabels(); // UI 업데이트
+            return true;
+        }
+        return false;
+    }
+
+    // 돈(=점수) 증가
+    public void addScore(int amount) {
+        score += amount;
+        updateLabels();
+    }
+
+    // 현재 점수 반환
+    public int getScore() {
+        return score;
+    }
+
+    // 게임 리셋 - 모든 데이터 초기화
+    public void reset() {
+        score = 0;
+        caughtFishCount.clear(); // 잡은 물고기 목록 초기화
+        updateLabels();
+        caughtFishPanel.removeAll(); // 패널의 모든 컴포넌트 제거
+        caughtFishPanel.revalidate();
+        caughtFishPanel.repaint();
+    }
+
+    // ================================
+    //      잡은 물고기 관리 기능
+    // ================================
+
+    // 잡은 물고기 추가
     public void addCaughtFish(String fishName) {
         caughtFishCount.put(fishName, caughtFishCount.getOrDefault(fishName, 0) + 1);
-        updateCaughtFishDisplay();
+        updateCaughtFishDisplay(); // 화면 업데이트
     }
-    
-    // 물고기 제거 메소드 (경매 시)
+
+    // 잡은 물고기 제거 (경매 등에 사용)
     public void removeCaughtFish(String fishName) {
         int count = caughtFishCount.getOrDefault(fishName, 0);
-        if (count > 1) {
-            caughtFishCount.put(fishName, count - 1);
-        } else if (count == 1) {
-            caughtFishCount.remove(fishName);
-        }
-        updateCaughtFishDisplay();
-    }
-    
-    // 그물망 화면 업데이트
-    private void updateCaughtFishDisplay() {
-        caughtFishPanel.removeAll(); // 기존 레이블 삭제
 
-        // 잡힌 모든 물고기 이름과 개수를 레이블로 추가
+        if (count > 1) {
+            caughtFishCount.put(fishName, count - 1); // 개수 1 감소
+        } else if (count == 1) {
+            caughtFishCount.remove(fishName); // 목록에서 제거
+        }
+
+        updateCaughtFishDisplay(); // 화면 업데이트
+    }
+
+    // 잡은 물고기 목록 화면 업데이트
+    private void updateCaughtFishDisplay() {
+        caughtFishPanel.removeAll(); // 기존 라벨 모두 제거
+
+        // 각 물고기를 라벨로 추가
         for (Map.Entry<String, Integer> entry : caughtFishCount.entrySet()) {
             JLabel fishLabel = new JLabel(entry.getKey() + ": " + entry.getValue());
             fishLabel.setFont(new Font("맑은 고딕", Font.BOLD, 14));
-            caughtFishPanel.add(fishLabel); // 물고기 정보 레이블 추가
+            caughtFishPanel.add(fishLabel);
         }
 
-        caughtFishPanel.revalidate(); // 레이아웃을 다시 계산하여 갱신
-        caughtFishPanel.repaint(); // 화면을 다시 그리기
+        caughtFishPanel.revalidate(); // 레이아웃 재계산
+        caughtFishPanel.repaint(); // 화면 다시 그리기
     }
 
-    // 물고기 가격을 파일에서 읽어오는 메서드
+    // ================================
+    //       물고기 가격 로딩
+    // ================================
+
+    // 파일에서 물고기 가격 정보 읽기
     private void loadFishPricesFromFile(String fileName) {
         try (BufferedReader br = new BufferedReader(new FileReader(fileName))) {
             String line;
             while ((line = br.readLine()) != null) {
-                String[] parts = line.split(",");
+                String[] parts = line.split(","); // 쉼표로 구분
                 if (parts.length == 2) {
-                	// 물고기 이름과 가격을 맵에 추가
+                    // 물고기 이름과 가격을 맵에 저장
                     fishPrices.put(parts[0].trim(), Integer.parseInt(parts[1].trim()));
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace(); // 파일 읽기 오류 발생 시 스택 트레이스 출력
+            System.out.println("물고기 가격 파일을 읽을 수 없습니다.");
         }
     }
-    
-    // 점수 반환 메소드 추가
-    public int getScore() {
-        return score;  // 현재 점수 반환
-    }
 
-    // 물고기 가격 맵을 반환하는 메서드
-    public Map<String, Integer> getFishPrices() {
-        return fishPrices;
-    }
-    
- // 점수와 잡힌 물고기 목록을 초기화하는 reset() 메서드 추가
-    public void reset() {
-        score = 0; // 점수 초기화
-        money = 0; // 돈 초기화
-        caughtFishCount.clear(); // 잡힌 물고기 목록 초기화
-        scoreLabel.setText(Integer.toString(score)); // 점수 레이블 업데이트
-        moneyLabel.setText(money + "원"); // 돈 레이블 업데이트
-        caughtFishPanel.removeAll(); // 물고기 목록 패널 초기화
-        caughtFishPanel.revalidate();  // 레이아웃을 다시 계산하여 갱신
-        caughtFishPanel.repaint(); // 화면을 다시 그리기
-    }
-    
-    public int getMoney() {
-        return money;
-    }
+    // ================================
+    //        배경 그리기
+    // ================================
 
-    // 돈 추가 (경매로 팔았을 때)
-    public void addMoney(int amount) {
-        money += amount;
-        moneyLabel.setText(money + "원");
-    }
-
-    // 돈 차감 (경매로 샀을 때)
-    public boolean spendMoney(int amount) {
-        if (money >= amount) {
-            money -= amount;
-            moneyLabel.setText(money + "원");
-            return true;
-        }
-        return false; // 돈이 부족함
-    }
-    
-    // 배경 이미지와 그물망 이미지 그리기
+    // 패널에 배경 이미지 그리기
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        
-        // 1. 배경 이미지 그리기 (NetBG.png)
-        if (backgroundImage != null) {
+
+        // 배경 이미지 그리기
+        if (backgroundImage != null)
             g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
-        }
-        
-        // 2. 그물망 이미지 그리기 (Net.png)
-        if (netImage != null) {
+
+        // 그물망 이미지 그리기
+        if (netImage != null)
             g.drawImage(netImage, 0, 0, getWidth(), getHeight(), this);
-        }
     }
 }
