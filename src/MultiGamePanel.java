@@ -1035,7 +1035,7 @@ public class MultiGamePanel extends JPanel {
             }
         } else {
             // 새 게임 시작
-            resetGame();
+        	resetGameField();
             addNewWord(); // 첫 물고기 생성
             gameTimer = new Timer(2000, e -> addNewWord()); // 2초마다 물고기 생성
             gameTimer.start();
