@@ -50,10 +50,6 @@ public class EditPanel extends JPanel {
                 try {
                     // 입력된 점수를 정수로 변환
                     int fishScore = Integer.parseInt(fishScoreStr);
-                    // TextSource 객체에 물고기 이름과 점수를 추가
-                    textSource.add(fishName, fishScore); 
-                    // 물고기 추가 성공 메시지
-                    JOptionPane.showMessageDialog(null, "물고기 '" + fishName + "'이(가) 추가되었습니다!");
                     // 입력 필드 초기화
                     fishNameField.setText(""); 
                     fishScoreField.setText(""); 
